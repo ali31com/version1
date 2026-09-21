@@ -1,4 +1,4 @@
-import { query } from "./_generated/server";
+import { env, query } from "./_generated/server";
 import { v } from "convex/values";
 
 export const check = query({
@@ -8,7 +8,7 @@ export const check = query({
   }),
   handler: () => {
     return {
-      environment: process.env.APP_ENV ?? "unset",
+      environment: env.APP_ENV,
     };
   },
 });
