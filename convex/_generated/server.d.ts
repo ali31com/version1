@@ -31,6 +31,7 @@ type Env = {
   readonly CONVEX_CLOUD_URL: string;
   readonly CONVEX_SITE_URL: string;
   readonly APP_ENV: string;
+  readonly GEMINI_API_KEY: string;
 };
 
 /**

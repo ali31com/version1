@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as gemini from "../gemini.js";
 import type * as health from "../health.js";
 import type * as myFunctions from "../myFunctions.js";
 
@@ -18,6 +19,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  gemini: typeof gemini;
   health: typeof health;
   myFunctions: typeof myFunctions;
 }>;

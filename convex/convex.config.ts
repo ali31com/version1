@@ -4,6 +4,7 @@ import { v } from "convex/values";
 const app = defineApp({
   env: {
     APP_ENV: v.string(),
+    GEMINI_API_KEY: v.string(),
   },
 });
 
