@@ -11,3 +11,7 @@ Convex agent skills for common tasks can be installed by running
 `npx convex ai-files install`.
 
 <!-- convex-ai-end -->
+
+## Demo planning context
+
+When asked to resume the live cataract demo, read [docs/START-HERE.md](docs/START-HERE.md). It maps the approved plan, research and open issues. Implementation is currently cancelled; this pointer is not a request to resume.
