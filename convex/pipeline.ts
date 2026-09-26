@@ -13,7 +13,9 @@ import { stageOutputV } from "./validators";
 export const MAX_ATTEMPTS_PER_STAGE = 3;
 export const DEFAULT_MAX_CONCURRENT = 8;
 export const WATCHDOG_MS = 45_000;
-const BACKOFF_MS = [1_000, 2_000];
+// Provider capacity spikes (HTTP 503) are usually short; wait longer
+// between attempts rather than adding attempts.
+const BACKOFF_MS = [2_000, 5_000];
 
 const PIPELINE_STAGES = ["packet", "annotate", "extract", "retrieve", "propose", "resolve", "route"] as const;
 type PipelineStage = (typeof PIPELINE_STAGES)[number];

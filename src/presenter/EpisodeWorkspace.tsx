@@ -316,6 +316,7 @@ const BASIS_LABEL: Record<string, string> = {
 function QuestionCards({ detail, selection, onSelect }: { detail: Detail; selection: Selection; onSelect: (s: Selection) => void }) {
   const answer = useMutation(api.presenter.answerQuestion);
   const [error, setError] = useState<string | null>(null);
+  const [pending, setPending] = useState(false);
   if (detail.questions.length === 0) return null;
   return (
     <div className="space-y-3">
@@ -350,11 +351,15 @@ function QuestionCards({ detail, selection, onSelect }: { detail: Detail; select
                   <button
                     key={o.id}
                     type="button"
+                    disabled={pending}
                     onClick={() => {
                       setError(null);
-                      answer({ questionId: q._id, optionId: o.id }).catch((e: unknown) => setError(e instanceof ConvexError ? String(e.data) : "Could not record the answer."));
+                      setPending(true);
+                      answer({ questionId: q._id, optionId: o.id })
+                        .catch((e: unknown) => setError(e instanceof ConvexError ? String(e.data) : "Could not record the answer."))
+                        .finally(() => setPending(false));
                     }}
-                    className="block w-full rounded-lg border border-warning/50 px-3 py-2 text-left hover:bg-warning/15"
+                    className="block w-full disabled:opacity-60 rounded-lg border border-warning/50 px-3 py-2 text-left hover:bg-warning/15"
                   >
                     <span className="block text-sm font-semibold">{o.label}</span>
                     <span className="block text-xs text-muted">{o.detail}</span>

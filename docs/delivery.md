@@ -1,6 +1,6 @@
 # Live cataract demo delivery
 
-Status: planning retained; implementation cancelled on 26 September 2026. All nine issues remain open. [Agent pickup guide](START-HERE.md).
+Status: implemented on [PR #14](https://github.com/ali31com/version1/pull/14) (closes #4–#12 on merge). Verification and unmet targets: [readiness record](research/readiness-measurements.md). [Agent pickup guide](START-HERE.md).
 
 Approved plan: [plan](plans/live-cataract-demo.md).
 

@@ -1,6 +1,6 @@
 # Agent pickup: live cataract coding demo
 
-Status: planning approved; implementation cancelled by the owner on 26 September 2026. Start fresh from the restored React/Vite/Convex starter. The owner retained the plan, research, milestone and all nine implementation issues. This handoff preserves context; it does not authorize resuming implementation without a new request.
+Status: implementation resumed by the owner on 26 September 2026 on branch `codex/live-cataract-demo-impl` ([PR #14](https://github.com/ali31com/version1/pull/14)). All nine slices are implemented; see the [readiness record](research/readiness-measurements.md) for verification and the unmet live-timing targets (free-tier Gemini key).
 
 ## Read only what the task needs
 

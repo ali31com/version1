@@ -75,7 +75,7 @@ async function drain(t: T) {
     if (running.length === 0) {
       const queued = await t.run((ctx) => ctx.db.query("attempts").withIndex("by_status_and_notBefore", (q) => q.eq("status", "queued")).collect());
       if (queued.length === 0) return;
-      vi.advanceTimersByTime(3_000);
+      vi.advanceTimersByTime(6_000);
       continue;
     }
     for (const a of running) await completeAttempt(t, a._id);
@@ -172,7 +172,7 @@ describe("processing", () => {
       await t.mutation(internal.pipeline.pump, {});
       let running = await runningAttempts(t);
       if (running.length === 0) {
-        vi.advanceTimersByTime(3_000);
+        vi.advanceTimersByTime(6_000);
         await t.mutation(internal.pipeline.pump, {});
         running = await runningAttempts(t);
       }

@@ -81,7 +81,7 @@ export function Worklist({
       className={`flex min-h-0 flex-col border-r border-line bg-surface ${compact ? "hidden w-[22rem] shrink-0 lg:flex" : "flex-1"}`}
     >
       <div className="space-y-2 border-b border-line p-3">
-        <div className="flex items-baseline justify-between">
+        <div className={compact ? "space-y-0.5" : "flex items-baseline justify-between gap-3"}>
           <h1 className="text-base font-semibold">Worklist</h1>
           <p className="text-xs text-muted" aria-live="polite">
             {counts.total} Episodes · {counts.active} in progress · <span className="text-success">{counts.auto} auto-coded</span> ·{" "}
