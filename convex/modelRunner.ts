@@ -8,7 +8,16 @@ import { validateStageOutput, type StageOutput } from "./lib/contracts";
 import { buildPrompt, hashText, responseSchema } from "./lib/prompts";
 import { REFERENCES } from "./lib/references";
 
-export const DEFAULT_MODEL = "gemini-3.8-flash";
+// Gemini Flash models tried in order across a stage's attempts; retries
+// rotate to the next model so a single model's 503 capacity spike does not
+// exhaust the budget. Override with a comma-separated GEMINI_MODEL.
+export const DEFAULT_MODELS = ["gemini-3.8-flash", "gemini-3.7-flash", "gemini-3.5-flash"];
+
+function modelForAttempt(attemptNumber: number): string {
+  const configured = env.GEMINI_MODEL?.split(",").map((m) => m.trim()).filter(Boolean);
+  const models = configured && configured.length > 0 ? configured : DEFAULT_MODELS;
+  return models[(attemptNumber - 1) % models.length];
+}
 // One HTTP request per attempt: the pipeline owns the retry budget.
 const PROVIDER_TIMEOUT_MS = 30_000;
 
@@ -29,7 +38,7 @@ export const runAttempt = internalAction({
       facts: context.facts,
       references: REFERENCES.filter((r) => retrieved.has(r.id)),
     });
-    const model = env.GEMINI_MODEL ?? DEFAULT_MODEL;
+    const model = modelForAttempt(context.attemptNumber);
     const started = Date.now();
     let rawOutput: string | undefined;
     let outcome: { ok: true; output: StageOutput } | { ok: false; error: string };

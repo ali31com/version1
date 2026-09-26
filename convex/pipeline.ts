@@ -222,6 +222,7 @@ export const getAttemptContext = internalQuery({
     const outputs = await loadOutputs(ctx, run._id);
     return {
       stage: attempt.stage,
+      attemptNumber: attempt.attemptNumber,
       startedAt: attempt.startedAt,
       passages: allPassages(doc.content),
       annotations: outputs.annotate?.annotations ?? [],

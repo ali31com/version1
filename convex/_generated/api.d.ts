@@ -18,6 +18,7 @@ import type * as lib_prompts from "../lib/prompts.js";
 import type * as lib_references from "../lib/references.js";
 import type * as metrics from "../metrics.js";
 import type * as modelRunner from "../modelRunner.js";
+import type * as models from "../models.js";
 import type * as myFunctions from "../myFunctions.js";
 import type * as participants from "../participants.js";
 import type * as pipeline from "../pipeline.js";
@@ -41,6 +42,7 @@ declare const fullApi: ApiFromModules<{
   "lib/references": typeof lib_references;
   metrics: typeof metrics;
   modelRunner: typeof modelRunner;
+  models: typeof models;
   myFunctions: typeof myFunctions;
   participants: typeof participants;
   pipeline: typeof pipeline;
