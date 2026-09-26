@@ -38,3 +38,12 @@ Join thousands of developers building full-stack apps with Convex:
 
 - Join the [Convex Discord community](https://convex.dev/community) to get help in real-time.
 - Follow [Convex on GitHub](https://github.com/get-convex/), star and contribute to the open-source implementation of Convex.
+
+## CodeGem live cataract coding demo
+
+- `npm run dev` — Convex dev deployment + Vite. Presenter workspace at `/`; the QR joins participants at `/join/<code>`, which redirects to a personal URL `/p/<token>`.
+- `npm test` — deterministic scenario and Convex state-machine suites (fake model; no network).
+- `node scripts/measure.mjs` — live readiness measurement (sends real Gemini requests).
+- Environment: `GEMINI_API_KEY` (a paid tier is needed for a 50-person audience) and optional `GEMINI_MODEL` (comma-separated Flash model IDs tried across attempts).
+
+See [docs/START-HERE.md](docs/START-HERE.md) and the [readiness record](docs/research/readiness-measurements.md).

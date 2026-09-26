@@ -1,6 +1,8 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import { ConvexProvider, ConvexReactClient } from "convex/react";
+import "@fontsource-variable/inter";
+import "@fontsource-variable/jetbrains-mono";
 import App from "./App";
 import "./index.css";
 
