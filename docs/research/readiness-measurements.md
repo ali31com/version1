@@ -27,7 +27,7 @@ Successful single attempts took 3–17 s per stage (`gemini-3.8-flash` 3–7 s, 
 The configured `GEMINI_API_KEY` is on the **free tier**. Provider responses:
 
 - HTTP 429 `generate_content_free_tier_requests, limit: 20` per model: a hard cap far below the ~150 requests a 50-participant demo needs.
-- Frequent HTTP 503 `UNAVAILABLE` ("high demand"). Free-tier traffic is shed first. 30 of 45 live pipeline attempts failed this way; plain probes seconds later succeeded.
+- Frequent HTTP 503 `UNAVAILABLE` ("high demand"). Free-tier traffic is shed first. 23 of the 32 live pipeline attempts above failed with 503 or 429; plain probes seconds later succeeded.
 
 Mitigation implemented: retries rotate across `gemini-3.8-flash` → `gemini-3.7-flash` → `gemini-3.5-flash` (override with a comma-separated `GEMINI_MODEL`), with 2 s / 5 s backoff within the approved three-attempts-per-stage budget. Every attempt records its exact model. There is no prepared-result fallback.
 
