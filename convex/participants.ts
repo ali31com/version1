@@ -128,7 +128,14 @@ async function episodeResult(ctx: QueryCtx, episode: Doc<"episodes">) {
     queueAhead = index >= 0 ? index : null;
   }
   const proposal = run?.effectiveProposal;
+  const document = run
+    ? await ctx.db
+        .query("documents")
+        .withIndex("by_episode_and_version", (q) => q.eq("episodeId", episode._id).eq("version", run.documentVersion))
+        .unique()
+    : null;
   return {
+    document: document?.content ?? null,
     worklistId: episode.worklistId,
     summary: episode.summary,
     laterality: episode.laterality,

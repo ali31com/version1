@@ -77,7 +77,7 @@ export function extractRaw(passages: Passage[], annotations: Annotation[], prese
   return JSON.stringify({ facts, conflicts });
 }
 
-const FACT_FOR_CODE: Record<string, ClinicalFact["kind"] | string> = {
+const FACT_FOR_CODE: Record<string, string> = {
   "H25.1": "diagnosis",
   "H26.9": "diagnosis",
   "H40.1": "glaucoma",

@@ -1,22 +1,87 @@
 @import "tailwindcss";
 
 @theme {
-  --color-light: #ffffff;
-  --color-dark: #171717;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "JetBrains Mono Variable", ui-monospace, monospace;
+
+  /* Presenter workspace (dark) — PRD §13.2 tokens */
+  --color-bg: #08111f;
+  --color-surface: #0c1829;
+  --color-raised: #112037;
+  --color-line: rgb(255 255 255 / 0.08);
+  --color-line-strong: rgb(255 255 255 / 0.16);
+  --color-text: #e6edf6;
+  --color-muted: #8a9bb4;
+  --color-accent: #2dd4bf;
+  --color-success: #4ade80;
+  --color-warning: #fbbf24;
+  --color-danger: #f87171;
+
+  /* Paper clinical document */
+  --color-paper: #f8f6f1;
+  --color-ink: #18202d;
+  --color-mark: rgb(20 184 166 / 0.24);
+  --color-mark-strong: rgb(20 184 166 / 0.42);
+  --color-mark-warning: rgb(245 158 11 / 0.3);
 }
 
-@media (prefers-color-scheme: dark) {
-  body {
-    color: var(--color-light);
-    background: var(--color-dark);
-    font-family: Arial, Helvetica, sans-serif;
+html,
+body,
+#root {
+  min-height: 100%;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  background: var(--color-bg);
+  color: var(--color-text);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-accent);
+  outline-offset: 2px;
+}
+
+@keyframes arrive {
+  from {
+    background-color: rgb(45 212 191 / 0.22);
+  }
+  to {
+    background-color: transparent;
   }
 }
 
-@media (prefers-color-scheme: light) {
-  body {
-    color: var(--color-dark);
-    background: var(--color-light);
-    font-family: Arial, Helvetica, sans-serif;
+.animate-arrive {
+  animation: arrive 2.4s ease-out;
+}
+
+@keyframes pulse-dot {
+  0%,
+  100% {
+    opacity: 1;
   }
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.animate-pulse-dot {
+  animation: pulse-dot 1.2s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+}
+
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: rgb(255 255 255 / 0.15) transparent;
 }
