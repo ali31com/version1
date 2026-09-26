@@ -1,6 +1,6 @@
 # Agent pickup: live cataract coding demo
 
-Status: implementation resumed by the owner on 26 September 2026 on branch `codex/live-cataract-demo-impl` ([PR #14](https://github.com/ali31com/version1/pull/14)). All nine slices are implemented; see the [readiness record](research/readiness-measurements.md) for verification and the unmet live-timing targets (free-tier Gemini key).
+Status: implementation resumed by the owner on 26 September 2026 on branch `codex/live-cataract-demo-impl` ([PR #14](https://github.com/ali31com/version1/pull/14)). All nine slices are implemented; see the [readiness record](research/readiness-measurements.md) for verification. On the paid Gemini tier, normal-load results arrive in 11–14 s and a 50-submission burst completed with no failures (last result at 78 s with 8 slots).
 
 ## Read only what the task needs
 
