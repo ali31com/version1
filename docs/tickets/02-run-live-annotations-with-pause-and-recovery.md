@@ -2,7 +2,7 @@
 
 Approved plan: [Live cataract demo](../plans/live-cataract-demo.md).
 
-Blocked by: Ticket 01 (tracker ID inserted on publication)
+Blocked by: #5
 
 ## Acceptance criteria
 
@@ -15,3 +15,5 @@ Blocked by: Ticket 01 (tracker ID inserted on publication)
 ## Verification
 
 Use focused domain/Convex/browser checks for the behaviour above, then run typecheck and lint. Preserve all model/reference versions and failures.
+
+Tracker: https://github.com/ali31com/version1/issues/6
