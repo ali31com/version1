@@ -20,7 +20,7 @@ The suites cover all 80 audience preset combinations plus both teaching fixtures
 | OPH-2001 | Audience phone: mature white, left, hypertension | Sent to review (H26.9 confirmation) → confirmed → approved; phone updated live | 281.7 s (two failed rounds, two presenter retries) | 15 (12) |
 | OPH-2002 | Contradictory laterality teaching fixture | Sent to review, Z94 withheld, conflict kept both sides → curated right-eye clarification → Z94.2 → approved | 45.8 s | 6 (3) |
 
-Successful single attempts took 3–17 s per stage (`gemini-3.8-flash` 3–7 s, `gemini-3.5-flash` 13–18 s). A run with no provider failures therefore needs roughly 15–40 s of model time, depending on which model answers.
+Successful single attempts took 3–18 s per stage (`gemini-3.8-flash` 3–7 s, `gemini-3.5-flash` 13–18 s). A run with no provider failures therefore needs roughly 15–40 s of model time, depending on which model answers.
 
 ## Provider limits found
 
