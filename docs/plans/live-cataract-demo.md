@@ -2,6 +2,8 @@
 
 Status: approved by the owner on 26 September 2026, including the scenario boundaries, defaults and ticket breakdown below.
 
+Execution status: implementation cancelled on 26 September 2026; approved requirements remain retained for a future authorized restart. See [agent pickup guide](../START-HERE.md).
+
 Date: 26 September 2026.
 
 ## Purpose

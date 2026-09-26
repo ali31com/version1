@@ -24,7 +24,7 @@ The owner's request governs scope. [PRD.md](../PRD.md) is a draft proposal to re
 - Include both review demonstrations: mature/white-cataract confirmation and a presenter-only contradictory-laterality example.
 - Security and production governance work are outside the requested design review.
 
-## Initial recommendations, not yet accepted
+## Initial recommendations (historical; approved plan supersedes these)
 
 - Separate the mobile participant builder from the dense presenter workspace.
 - Build clinical notes deterministically from compatible preset fragments. Name and age alone should not imply a diagnosis; “complication: yes” should branch to a named complication and its management.
@@ -58,17 +58,17 @@ Round 2 partially answered: the proposed starting scenario set and presenter ins
 
 Round 3 accepted by the owner: visible failure with retry, 30-second target, and both review demonstrations. All product questions posed so far are now answered. Routine defaults and scenario compatibility boundaries are presented in the draft plan for final scope consensus.
 
-## Current interview frontier
+## Final consensus
 
-Validate the complete draft plan, especially its bounded complication preset and routine presenter/session defaults. The 60-second recommendation was rejected in favour of a 30-second target.
+The interview is complete. The 60-second recommendation was rejected in favour of a 30-second target.
 
-Final consensus: the owner explicitly approved the plan and ticket breakdown, including its routine defaults and complication boundaries. Proceed to tracker publication and implementation without another scope approval.
+Final consensus: the owner explicitly approved the plan and ticket breakdown, including its routine defaults and complication boundaries. Tracker publication is complete. Implementation was subsequently cancelled by the owner; retain this consensus for a future authorized restart.
 
-The reviewable [plan and proposed ticket breakdown](../plans/live-cataract-demo.md) are now written. [Clinical preset research](../research/cataract-preset-references.md) verified the diagnosis specificity and anterior-vitrectomy entry, but did not establish the complete rupture diagnosis/external-cause mapping or combined procedure sequence. The draft therefore proposes uncomplicated bilateral surgery only and a unilateral complication review path, with final approval blocked until missing coding coverage is resolved. These boundaries need final owner validation.
+The reviewable [plan and proposed ticket breakdown](../plans/live-cataract-demo.md) are now written. [Clinical preset research](../research/cataract-preset-references.md) verified the diagnosis specificity and anterior-vitrectomy entry, but did not establish the complete rupture diagnosis/external-cause mapping or combined procedure sequence. The draft therefore proposes uncomplicated bilateral surgery only and a unilateral complication review path, with final approval blocked until missing coding coverage is resolved. The owner approved these boundaries.
 
-## Subsequent decisions
+## Approved routine defaults
 
-After the current answers: present the complete scope for final consensus, including routine proposed defaults. Proposed defaults are a dark presenter workspace with paper clinical documents, a light phone builder, steady presenter selection, pause that allows active requests to finish, and a new-demo control that starts a fresh Worklist and QR join route while preserving the previous demo's results. These are proposals rather than settled requirements.
+The approved defaults are a dark presenter workspace with paper clinical documents, a light phone builder, steady presenter selection, pause that allows active requests to finish, and a new-demo control that starts a fresh Worklist and QR join route while preserving the previous demo's results. These are settled requirements.
 
 ## Repository findings
 
@@ -76,7 +76,7 @@ The repository currently contains a React/Vite/Convex starter, a health-check pa
 
 The existing Gemini action specifies `gemini-3.8-flash`; model availability must be verified against official documentation before adopting it. Dependencies are declared in [package.json](../../package.json).
 
-`/docs` is currently ignored by [.gitignore](../../.gitignore). These local documents and the PRD will need explicit inclusion in the eventual planning PR; this review does not change ignore rules or publish tracker items.
+`docs/` is tracked on the planning branch. The [delivery map](../delivery.md) links the published milestone and nine open issues. The cancelled implementation PR is closed; the planning branch remains available.
 
 ## Delivery sequence requested by the owner
 
