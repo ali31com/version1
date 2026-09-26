@@ -32,6 +32,10 @@ Headless Chromium against Vite + the dev deployment (desktop 1600×900, phone 39
 
 Successful single attempts took 3–18 s per stage (`gemini-3.8-flash` 3–7 s, `gemini-3.5-flash` 13–18 s). A run with no provider failures therefore needs roughly 15–40 s of model time, depending on which model answers.
 
+### Normal-load measurement after the owner enabled billing (18:50 UTC)
+
+`node scripts/measure.mjs --submit 3` (sequential): 1 of 3 Episodes completed, auto-coded, first actionable result in 80.1 s. The other 2 failed visibly after exhausting the attempt budget. 16 of 21 attempts failed. Every `gemini-3.8-flash` attempt still returned 429 `generate_content_free_tier_requests`; `gemini-3.7-flash` and `gemini-3.5-flash` returned 503 (high demand). So the key configured in the Convex deployment was still on the free tier when measured. Queue wait stayed at or below 0.2 s.
+
 ## Provider limits found
 
 The configured `GEMINI_API_KEY` is on the **free tier**. Provider responses:
