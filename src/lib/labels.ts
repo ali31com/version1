@@ -1,18 +1,4 @@
-export const PIPELINE_STAGES = [
-  { stage: "packet", label: "Episode packet", short: "Packet", role: "Deterministic" },
-  { stage: "annotate", label: "MedCAT annotations", short: "Annotate", role: "Gemini Flash as MedCAT" },
-  { stage: "extract", label: "Clinical facts", short: "Facts", role: "Gemini Flash as MedGemma" },
-  { stage: "retrieve", label: "Coding references", short: "References", role: "Deterministic" },
-  { stage: "propose", label: "Proposed codes", short: "Codes", role: "Gemini Flash as MedGemma" },
-  { stage: "resolve", label: "Open questions", short: "Questions", role: "Deterministic" },
-  { stage: "route", label: "Checks and routing", short: "Checks", role: "Deterministic" },
-] as const;
-
-export type StageName = (typeof PIPELINE_STAGES)[number]["stage"];
-
-export function stageLabel(stage: string): string {
-  return PIPELINE_STAGES.find((s) => s.stage === stage)?.label ?? stage;
-}
+export { PIPELINE_STAGES, stageLabel } from "../../convex/lib/stages";
 
 // Participant builder copy: precise preset descriptions (approved plan).
 export const SIDE_OPTIONS = [

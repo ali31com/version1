@@ -11,10 +11,12 @@ import {
   retryFailedStage,
   reviewState,
   saveFinalCoding,
-  STAGE_LABELS,
+  getRunDocument,
+  liveQuestions,
 } from "./pipeline";
-import { applyLateralityClarification, routeResult, runChecks } from "./lib/checks";
+import { applyLateralityClarification, CLARIFICATION_REFERENCE_IDS, routeResult, runChecks } from "./lib/checks";
 import { allPassages, teachingPreset } from "./lib/presets";
+import { stageLabel } from "./lib/stages";
 import { REFERENCES } from "./lib/references";
 
 // The presenter workspace is unauthenticated: production security is
@@ -77,18 +79,9 @@ export const episodeDetail = query({
     const episode = await ctx.db.get("episodes", episodeId);
     if (!episode) return null;
     const run = episode.activeRunId ? await ctx.db.get("runs", episode.activeRunId) : null;
-    const document = run
-      ? await ctx.db
-          .query("documents")
-          .withIndex("by_episode_and_version", (q) => q.eq("episodeId", episodeId).eq("version", run.documentVersion))
-          .unique()
-      : null;
+    const document = run ? await getRunDocument(ctx, run) : null;
     const outputs = run ? await loadOutputs(ctx, run._id) : {};
-    const questions = run
-      ? (await ctx.db.query("questions").withIndex("by_run", (q) => q.eq("runId", run._id)).take(20)).filter(
-          (q) => q.status !== "withdrawn",
-        )
-      : [];
+    const questions = run ? await liveQuestions(ctx, run._id) : [];
     const attempts = await ctx.db
       .query("attempts")
       .withIndex("by_episode", (q) => q.eq("episodeId", episodeId))
@@ -181,7 +174,6 @@ export const episodeDetail = query({
         finishedAt: a.finishedAt ?? null,
         latencyMs: a.latencyMs ?? null,
         error: a.error ?? null,
-        rawOutputLength: a.rawOutput?.length ?? 0,
       })),
       decisions: decisions.map((d) => ({ _id: d._id, kind: d.kind, summary: d.summary, at: d.at })),
       finalCoding: final && run && final.runId === run._id ? final : null,
@@ -189,11 +181,14 @@ export const episodeDetail = query({
   },
 });
 
-export const rawOutput = query({
+export const attemptPayload = query({
   args: { attemptId: v.id("attempts") },
   handler: async (ctx, { attemptId }) => {
-    const attempt = await ctx.db.get("attempts", attemptId);
-    return attempt?.rawOutput ?? null;
+    const row = await ctx.db
+      .query("attemptPayloads")
+      .withIndex("by_attempt", (q) => q.eq("attemptId", attemptId))
+      .first();
+    return row ? { prompt: row.prompt, rawOutput: row.rawOutput ?? null } : null;
   },
 });
 
@@ -329,6 +324,7 @@ export const answerQuestion = mutation({
     let retrieved = run.retrievedReferenceIds ?? [];
     let amended = run.amended;
     if (question.kind === "laterality" && optionId === "clarify_right") {
+      // Presenter facts use f90+ so they never collide with model fact IDs.
       const factId = `f${String(90 + presenterFacts.length).padStart(2, "0")}`;
       presenterFacts = [
         ...presenterFacts,
@@ -343,18 +339,14 @@ export const answerQuestion = mutation({
         },
       ];
       proposal = applyLateralityClarification(proposal, factId);
-      retrieved = [...new Set([...retrieved, "opcs:Z94.2", "std:PCSZ2", "std:PRule7"])];
+      retrieved = [...new Set([...retrieved, ...CLARIFICATION_REFERENCE_IDS])];
       amended = true;
     }
 
-    const all = await ctx.db.query("questions").withIndex("by_run", (q) => q.eq("runId", run._id)).take(20);
-    const live = all.filter((q) => q.status !== "withdrawn");
+    const live = await liveQuestions(ctx, run._id);
     const answers = live.filter((q) => q.status === "answered" && q.answer).map((q) => ({ key: q.key, optionId: q.answer!.optionId }));
     const outputs = await loadOutputs(ctx, run._id);
-    const doc = (await ctx.db
-      .query("documents")
-      .withIndex("by_episode_and_version", (q) => q.eq("episodeId", episode._id).eq("version", run.documentVersion))
-      .unique())!;
+    const doc = await getRunDocument(ctx, run);
     const checks = runChecks({
       preset: episode.preset,
       passages: allPassages(doc.content),
@@ -395,9 +387,7 @@ export const approve = mutation({
       throw new ConvexError("Only a completed Episode sent to review can be approved.");
     }
     if (episode.review === "approved") return null;
-    const questions = (await ctx.db.query("questions").withIndex("by_run", (q) => q.eq("runId", run._id)).take(20)).filter(
-      (q) => q.status !== "withdrawn",
-    );
+    const questions = await liveQuestions(ctx, run._id);
     const blocking = questions.filter((q) => q.status === "unresolved");
     if (blocking.length > 0) {
       throw new ConvexError(`Approval blocked by an unresolved Open question: ${blocking[0].question}`);
@@ -420,13 +410,8 @@ export const retry = mutation({
   handler: async (ctx, { episodeId }) => {
     const episode = await ctx.db.get("episodes", episodeId);
     if (!episode) throw new ConvexError("Episode not found.");
-    let stage;
-    try {
-      stage = await retryFailedStage(ctx, episode);
-    } catch (e) {
-      throw new ConvexError(e instanceof Error ? e.message : "Retry failed.");
-    }
-    await logDecision(ctx, episode._id, episode.activeRunId, "retry", `Retried the ${STAGE_LABELS[stage]} stage; accepted earlier stages kept.`);
+    const stage = await retryFailedStage(ctx, episode);
+    await logDecision(ctx, episode._id, episode.activeRunId, "retry", `Retried the ${stageLabel(stage)} stage; accepted earlier stages kept.`);
     return null;
   },
 });

@@ -83,7 +83,7 @@ function Builder({ token, view }: { token: string; view: View }) {
   const [nameInput, setNameInput] = useState(view.draft.displayName ?? "");
   const [ageInput, setAgeInput] = useState(view.draft.age !== undefined ? String(view.draft.age) : "");
 
-  if (view.session.closed && step === 0) {
+  if (view.session.closed) {
     return <p className="py-16 text-center text-slate-600">This demo has finished. Scan the current QR code to join the new one.</p>;
   }
 

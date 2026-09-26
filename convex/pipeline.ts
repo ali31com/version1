@@ -2,10 +2,12 @@ import { v } from "convex/values";
 import { internal } from "./_generated/api";
 import type { Doc, Id } from "./_generated/dataModel";
 import { internalMutation, internalQuery, type MutationCtx, type QueryCtx } from "./_generated/server";
+import { ConvexError } from "convex/values";
 import { deriveQuestions, routeResult, runChecks, type Check, type QuestionSpec } from "./lib/checks";
 import type { ModelStage } from "./lib/contracts";
 import { allPassages, generateSourceDocument, lateralityLabel, PRESET_VERSION, scenarioSummary, type Preset } from "./lib/presets";
 import { EMULATED_ROLE, PROMPT_VERSIONS } from "./lib/prompts";
+import { PIPELINE_STAGES, stageLabel, type PipelineStage } from "./lib/stages";
 import { REFERENCE_LIBRARY_VERSION, retrieveReferences } from "./lib/references";
 import { stageOutputV } from "./validators";
 
@@ -17,19 +19,7 @@ export const WATCHDOG_MS = 45_000;
 // between attempts rather than adding attempts.
 const BACKOFF_MS = [2_000, 5_000];
 
-const PIPELINE_STAGES = ["packet", "annotate", "extract", "retrieve", "propose", "resolve", "route"] as const;
-type PipelineStage = (typeof PIPELINE_STAGES)[number];
 type StageStatus = Doc<"runs">["stages"][number]["status"];
-
-export const STAGE_LABELS: Record<PipelineStage, string> = {
-  packet: "Episode packet",
-  annotate: "MedCAT annotations",
-  extract: "Clinical facts",
-  retrieve: "Coding references",
-  propose: "Proposed codes",
-  resolve: "Open questions",
-  route: "Checks and routing",
-};
 
 export async function getControl(ctx: MutationCtx): Promise<Doc<"control">> {
   const existing = await ctx.db
@@ -113,7 +103,7 @@ export async function startRun(ctx: MutationCtx, episodeId: Id<"episodes">): Pro
     referenceVersion: REFERENCE_LIBRARY_VERSION,
     promptVersions: PROMPT_VERSIONS,
     createdAt: now,
-    stages: PIPELINE_STAGES.map((stage) =>
+    stages: PIPELINE_STAGES.map(({ stage }) =>
       stage === "packet"
         ? { stage, status: "done" as const, startedAt: now, finishedAt: now }
         : { stage, status: "pending" as const },
@@ -216,11 +206,7 @@ export const getAttemptContext = internalQuery({
     const attempt = await ctx.db.get("attempts", attemptId);
     if (!attempt || attempt.status !== "running" || attempt.startedAt === undefined) return null;
     const run = (await ctx.db.get("runs", attempt.runId))!;
-    const doc = await ctx.db
-      .query("documents")
-      .withIndex("by_episode_and_version", (q) => q.eq("episodeId", attempt.episodeId).eq("version", run.documentVersion))
-      .unique();
-    if (!doc) return null;
+    const doc = await getRunDocument(ctx, run);
     const outputs = await loadOutputs(ctx, run._id);
     return {
       stage: attempt.stage,
@@ -255,6 +241,27 @@ export async function loadOutputs(ctx: QueryCtx, runId: Id<"runs">): Promise<Out
   return out;
 }
 
+export async function getRunDocument(ctx: QueryCtx, run: Doc<"runs">) {
+  const doc = await ctx.db
+    .query("documents")
+    .withIndex("by_episode_and_version", (q) => q.eq("episodeId", run.episodeId).eq("version", run.documentVersion))
+    .unique();
+  if (!doc) throw new Error("Source document missing for run");
+  return doc;
+}
+
+// Open questions of a run, excluding those withdrawn by a retry.
+export async function liveQuestions(ctx: QueryCtx, runId: Id<"runs">) {
+  const rows = await ctx.db.query("questions").withIndex("by_run", (q) => q.eq("runId", runId)).take(20);
+  return rows.filter((q) => q.status !== "withdrawn");
+}
+
+// Fence: an attempt may change state only while its run is the Episode's
+// active run and the attempt belongs to the current retry round.
+function isCurrentAttempt(attempt: Doc<"attempts">, run: Doc<"runs">, episode: Doc<"episodes">): boolean {
+  return run.status !== "superseded" && episode.activeRunId === run._id && run.retryRound === attempt.round;
+}
+
 async function releaseSlot(ctx: MutationCtx) {
   const control = await getControl(ctx);
   await ctx.db.patch("control", control._id, { running: Math.max(0, control.running - 1) });
@@ -268,6 +275,7 @@ export const recordAttemptResult = internalMutation({
       v.object({ ok: v.literal(true), output: stageOutputV }),
       v.object({ ok: v.literal(false), error: v.string() }),
     ),
+    prompt: v.string(),
     rawOutput: v.optional(v.string()),
     model: v.string(),
     inputHash: v.string(),
@@ -287,13 +295,15 @@ export const recordAttemptResult = internalMutation({
       finishedAt: now,
       model: args.model,
       inputHash: args.inputHash,
-      rawOutput: args.rawOutput,
       latencyMs: args.latencyMs,
     };
+    // Stage input and raw output are kept for audit in their own table so
+    // attempt rows stay small for Worklist, detail and metrics reads.
+    await ctx.db.insert("attemptPayloads", { attemptId: attempt._id, prompt: args.prompt, rawOutput: args.rawOutput });
     const run = (await ctx.db.get("runs", attempt.runId))!;
     const episode = (await ctx.db.get("episodes", attempt.episodeId))!;
     await ctx.scheduler.runAfter(0, internal.pipeline.pump, {});
-    if (run.status === "superseded" || episode.activeRunId !== run._id || run.retryRound !== attempt.round) {
+    if (!isCurrentAttempt(attempt, run, episode)) {
       await ctx.db.patch("attempts", attempt._id, { ...base, status: "stale" });
       return { accepted: false };
     }
@@ -327,7 +337,7 @@ export const watchdog = internalMutation({
     await ctx.db.patch("attempts", attemptId, { status: "timed_out", finishedAt: Date.now(), error });
     const run = (await ctx.db.get("runs", attempt.runId))!;
     const episode = (await ctx.db.get("episodes", attempt.episodeId))!;
-    if (run.status !== "superseded" && episode.activeRunId === run._id && run.retryRound === attempt.round) {
+    if (isCurrentAttempt(attempt, run, episode)) {
       await handleFailure(ctx, attempt, run, error);
     }
     await ctx.scheduler.runAfter(0, internal.pipeline.pump, {});
@@ -349,7 +359,7 @@ async function handleFailure(ctx: MutationCtx, attempt: Doc<"attempts">, run: Do
       stage: attempt.stage,
       round: attempt.round,
       attemptNumber: sameRound.length + 1,
-      delayMs: BACKOFF_MS[sameRound.length - 1] ?? 2_000,
+      delayMs: BACKOFF_MS[Math.min(sameRound.length, BACKOFF_MS.length) - 1],
     });
     return;
   }
@@ -360,7 +370,7 @@ async function handleFailure(ctx: MutationCtx, attempt: Doc<"attempts">, run: Do
     failedStage: attempt.stage,
     failure: error,
     result: "sent_to_review",
-    reason: `Pipeline could not complete the ${STAGE_LABELS[attempt.stage]} stage after ${MAX_ATTEMPTS_PER_STAGE} attempts. Accepted earlier stages are kept; retry the failed stage.`,
+    reason: `Pipeline could not complete the ${stageLabel(attempt.stage)} stage after ${MAX_ATTEMPTS_PER_STAGE} attempts. Accepted earlier stages are kept; retry the failed stage.`,
     completedAt: now,
   });
   await ctx.db.patch("episodes", run.episodeId, {
@@ -375,7 +385,7 @@ async function handleFailure(ctx: MutationCtx, attempt: Doc<"attempts">, run: Do
     key: `system:${attempt.stage}:${attempt.round}`,
     kind: "system",
     basis: "system_failure",
-    question: `Pipeline could not complete the ${STAGE_LABELS[attempt.stage]} stage.`,
+    question: `Pipeline could not complete the ${stageLabel(attempt.stage)} stage.`,
     revisited: `Last error: ${error}`,
     blocks: "Coding cannot be approved. No prepared result is substituted; retry the stage or rerun the Episode.",
     passageIds: [],
@@ -415,10 +425,7 @@ async function advance(ctx: MutationCtx, runId: Id<"runs">, stage: ModelStage) {
 async function finalizeRun(ctx: MutationCtx, runId: Id<"runs">) {
   const run = (await ctx.db.get("runs", runId))!;
   const episode = (await ctx.db.get("episodes", run.episodeId))!;
-  const doc = (await ctx.db
-    .query("documents")
-    .withIndex("by_episode_and_version", (q) => q.eq("episodeId", episode._id).eq("version", run.documentVersion))
-    .unique())!;
+  const doc = await getRunDocument(ctx, run);
   const outputs = await loadOutputs(ctx, runId);
   const proposal = outputs.propose!.proposal;
   const passages = allPassages(doc.content);
@@ -508,7 +515,7 @@ export async function saveFinalCoding(
 // earlier outputs of the same run.
 export async function retryFailedStage(ctx: MutationCtx, episode: Doc<"episodes">) {
   const run = episode.activeRunId ? await ctx.db.get("runs", episode.activeRunId) : null;
-  if (!run || run.status !== "failed" || !run.failedStage) throw new Error("Only a failed run can be retried.");
+  if (!run || run.status !== "failed" || !run.failedStage) throw new ConvexError("Only a failed run can be retried.");
   const round = run.retryRound + 1;
   const stages = run.stages.map((s) => (s.stage === run.failedStage ? { stage: s.stage, status: "pending" as const } : s));
   await ctx.db.patch("runs", run._id, {

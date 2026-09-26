@@ -12,6 +12,16 @@ Date: 26 September 2026. Branch `codex/live-cataract-demo-impl`, [PR #14](https:
 
 The suites cover all 80 audience preset combinations plus both teaching fixtures (coherent note, explicit comorbidities, rupture treatment, no codes in the note, expected codes reachable by retrieval), the five PRD golden scenarios, routing and check failures (sequence, side, duplicates, missing comorbidity, unknown code, two primaries), output validation, submit-once idempotency, draft resume, pause/resume, the concurrency limit, the shared attempt budget, visible failure and retry keeping accepted work, the watchdog and late-result fencing, rerun staleness, clarification/confirmation/approval, blocked rupture approval and new demo sessions. These use a deterministic fake model (`convex/fakeModel.testkit.ts`) and do not show live provider behaviour or clinical correctness beyond the fixture references.
 
+## Browser walkthrough
+
+Headless Chromium against Vite + the dev deployment (desktop 1600×900, phone 390×844). Kept to one pass, per the repository's instruction to limit browser testing.
+
+- QR overlay opened and closed with Esc. Phone join → personal URL. Name and age inputs, then side, cataract type, complication and three comorbidity answers. A refresh mid-builder resumed on the cataract step. The review summary edited correctly. A double-clicked Submit created one Episode. Rejoining through the shared QR in the same browser returned the same personal URL.
+- The Episode arrived live on the Worklist (highlighted, selection unchanged). Its provider failure was visible on phone and presenter, and the presenter Retry button resumed it, keeping accepted stages.
+- Mature/white review: code click → supporting facts, highlighted passages, explanation and references. Confirm H26.9 → Approve; the phone showed "Approved by the presenter" live without a refresh.
+- Contradictory laterality (presenter-only teaching case): question with conflicting passages highlighted → curated right-eye clarification → Z94.2 appended → approval → run log shows decisions. Passage click showed the citing facts, including the presenter fact, and Z94.2.
+- Two console errors were found and fixed: a missing favicon (404) and a duplicate answer submission (answer buttons now disable while pending).
+
 ## Live Gemini runs (separate from the mock regressions)
 
 | Episode | Scenario | Outcome | Submit → first actionable result | Model attempts (failed) |
@@ -36,6 +46,10 @@ Mitigation implemented: retries rotate across `gemini-3.8-flash` → `gemini-3.7
 - **30-second normal-load target: not met on this key.** Only OPH-2002 approached it (45.8 s). All delay came from provider 503/429 retries; queue wait was under 0.5 s.
 - **50-submission burst: not run.** It needs ~150 generation requests, which exceeds the free-tier cap and would only measure quota rejections. Run `node scripts/measure.mjs --submit 50 --burst` after enabling billing on the Google AI project. Then choose `maxConcurrent` (default 8, adjustable with `presenter:setMaxConcurrent`) from the observed latency and rate limits.
 - Normal-load measurement tool: `node scripts/measure.mjs --submit 5`. Report an existing session with `--report <sessionId>`.
+
+## Implementation decisions
+
+See [ADR 0002](../adr/0002-hand-rolled-stage-queue.md): a hand-rolled stage queue instead of Workpool, deterministic follow-up stages completing inside the accepting mutation (also while paused), and a fresh attempt budget for each deliberate presenter retry. Stage 6 is deterministic: it links the relevant passages but makes no model re-reading call. Each attempt stores its exact prompt and raw output in `attemptPayloads`.
 
 ## Recovery limitations
 

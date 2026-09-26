@@ -1,7 +1,7 @@
 import { ConvexError, v } from "convex/values";
 import type { Doc } from "./_generated/dataModel";
 import { mutation, query, type QueryCtx } from "./_generated/server";
-import { createEpisode, loadOutputs, readControl } from "./pipeline";
+import { createEpisode, getRunDocument, liveQuestions, loadOutputs, readControl } from "./pipeline";
 import { audiencePreset, MAX_AGE, MIN_AGE, validateSelections } from "./lib/presets";
 import { codeTitle } from "./lib/references";
 import { draftV } from "./validators";
@@ -43,6 +43,15 @@ async function participantByToken(ctx: QueryCtx, token: string): Promise<Doc<"pa
     .unique();
 }
 
+// After "New demo", unsubmitted drafts from the earlier session stay
+// viewable but cannot create Episodes in a Worklist nobody is watching.
+async function assertSessionOpen(ctx: QueryCtx, participant: Doc<"participants">) {
+  const session = await ctx.db.get("demoSessions", participant.sessionId);
+  if (!session || session.closedAt !== undefined) {
+    throw new ConvexError("This demo has finished. Scan the current QR code to join the new one.");
+  }
+}
+
 export const saveDraft = mutation({
   args: { token: v.string(), draft: draftV, step: v.number() },
   returns: v.null(),
@@ -50,6 +59,7 @@ export const saveDraft = mutation({
     const participant = await participantByToken(ctx, args.token);
     if (!participant) throw new ConvexError("Personal link not found.");
     if (participant.episodeId) throw new ConvexError("This Episode has already been submitted.");
+    await assertSessionOpen(ctx, participant);
     const draft = { ...participant.draft, ...args.draft };
     if (draft.displayName !== undefined) draft.displayName = draft.displayName.slice(0, 40);
     if (draft.age !== undefined && (!Number.isInteger(draft.age) || draft.age < MIN_AGE || draft.age > MAX_AGE)) {
@@ -71,6 +81,7 @@ export const submit = mutation({
     const participant = await participantByToken(ctx, args.token);
     if (!participant) throw new ConvexError("Personal link not found.");
     if (participant.episodeId) return participant.episodeId;
+    await assertSessionOpen(ctx, participant);
     const { selections, errors } = validateSelections(participant.draft);
     if (!selections) throw new ConvexError(errors.map((e) => e.message).join(" "));
     const episodeId = await createEpisode(ctx, {
@@ -108,11 +119,7 @@ export const view = query({
 async function episodeResult(ctx: QueryCtx, episode: Doc<"episodes">) {
   const run = episode.activeRunId ? await ctx.db.get("runs", episode.activeRunId) : null;
   const outputs = run ? await loadOutputs(ctx, run._id) : {};
-  const questions = run
-    ? (await ctx.db.query("questions").withIndex("by_run", (q) => q.eq("runId", run._id)).take(20)).filter(
-        (q) => q.status !== "withdrawn",
-      )
-    : [];
+  const questions = run ? await liveQuestions(ctx, run._id) : [];
   const final = await ctx.db
     .query("finalCodings")
     .withIndex("by_episode", (q) => q.eq("episodeId", episode._id))
@@ -128,12 +135,7 @@ async function episodeResult(ctx: QueryCtx, episode: Doc<"episodes">) {
     queueAhead = index >= 0 ? index : null;
   }
   const proposal = run?.effectiveProposal;
-  const document = run
-    ? await ctx.db
-        .query("documents")
-        .withIndex("by_episode_and_version", (q) => q.eq("episodeId", episode._id).eq("version", run.documentVersion))
-        .unique()
-    : null;
+  const document = run ? await getRunDocument(ctx, run) : null;
   return {
     document: document?.content ?? null,
     worklistId: episode.worklistId,

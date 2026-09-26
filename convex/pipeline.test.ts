@@ -60,6 +60,7 @@ async function completeAttempt(t: T, attemptId: Id<"attempts">, rawOverride?: st
     attemptId,
     startedAt: context.startedAt,
     outcome: validated.ok ? { ok: true, output: validated.value } : { ok: false, error: validated.error },
+    prompt: "test prompt",
     rawOutput: raw,
     model: "fake-model",
     inputHash: "test",
@@ -210,6 +211,7 @@ describe("processing", () => {
       attemptId: attempt._id,
       startedAt: context!.startedAt,
       outcome: { ok: false, error: "late" },
+      prompt: "test prompt",
       model: "fake-model",
       inputHash: "x",
       latencyMs: 1,
@@ -297,6 +299,10 @@ describe("demo sessions", () => {
     expect(await t.query(api.presenter.worklist, { sessionId: second })).toHaveLength(0);
     expect((await t.query(api.participants.view, { token }))!.episode).not.toBeNull();
     await expect(t.mutation(api.participants.join, { code })).rejects.toThrow(/finished/);
+    const { token: stale } = await t.mutation(api.participants.join, { code: (await t.run((ctx) => ctx.db.get("demoSessions", second)))!.code });
+    await t.mutation(api.presenter.newDemoSession, {});
+    await expect(t.mutation(api.participants.saveDraft, { token: stale, step: 1, draft: { age: 70 } })).rejects.toThrow(/finished/);
+    await expect(t.mutation(api.participants.submit, { token: stale })).rejects.toThrow(/finished/);
     expect((await t.mutation(api.participants.join, { code, token })).token).toBe(token);
   });
 });

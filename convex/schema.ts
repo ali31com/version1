@@ -152,13 +152,20 @@ export default defineSchema({
     role: v.union(v.literal("MedCAT"), v.literal("MedGemma")),
     promptVersion: v.string(),
     inputHash: v.optional(v.string()),
-    rawOutput: v.optional(v.string()),
     error: v.optional(v.string()),
     latencyMs: v.optional(v.number()),
   })
     .index("by_status_and_notBefore", ["status", "notBefore"])
     .index("by_run_and_stage", ["runId", "stage"])
     .index("by_episode", ["episodeId"]),
+
+  // Exact stage input (prompt) and raw model response for each attempt,
+  // stored for audit apart from the attempt rows.
+  attemptPayloads: defineTable({
+    attemptId: v.id("attempts"),
+    prompt: v.string(),
+    rawOutput: v.optional(v.string()),
+  }).index("by_attempt", ["attemptId"]),
 
   // Accepted (validated) stage outputs; immutable once written.
   outputs: defineTable({

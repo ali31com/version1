@@ -75,8 +75,8 @@ export function deriveQuestions(input: Omit<CheckInput, "answers" | "rejectedAnn
       question: "Which eye was operated on?",
       revisited:
         sides.length > 0
-          ? `Re-read every passage that names the eye. The source supports more than one side: ${sides.join("; ")}. No passage explains the difference.`
-          : "Re-read every passage that names the eye. The passages name different eyes, but the extracted facts did not record the contradiction.",
+          ? `Structured contradiction from fact extraction; every passage naming an eye is linked below. The source supports more than one side: ${sides.join("; ")}. No passage explains the difference.`
+          : "Deterministic side check: passages name different eyes, but fact extraction did not record the contradiction. Every passage naming an eye is linked below.",
       blocks: "Laterality code (Z94.2 or Z94.3) cannot be assigned; PCSZ2 requires documented laterality to be coded.",
       passageIds,
       factIds: factsCiting(facts, passageIds),
@@ -130,7 +130,7 @@ export function deriveQuestions(input: Omit<CheckInput, "answers" | "rejectedAnn
       basis: "teaching_policy",
       question: "Confirm H26.9 rather than an H25 age-related cataract code.",
       revisited:
-        "Re-read the indication and findings: the cataract is documented as mature and white. DCS.VII.1 points to H26.9, overriding the most likely clinical category even for an older patient.",
+        "Indication and findings passages document a mature white cataract. DCS.VII.1 points to H26.9, overriding the most likely clinical category even for an older patient.",
       blocks: "Primary diagnosis is proposed but not confirmed. This confirmation is a demo teaching policy, not a national coding requirement.",
       passageIds,
       factIds: factsCiting(facts, passageIds),
@@ -154,7 +154,7 @@ export function deriveQuestions(input: Omit<CheckInput, "answers" | "rejectedAnn
       question:
         "Is the complication code set complete? The posterior capsule rupture diagnosis, its external cause and the combined procedure sequence are not verified in the demo reference library.",
       revisited:
-        "Re-read the complication and procedure passages: rupture, vitreous prolapse, anterior vitrectomy and an unsutured sulcus lens are explicitly documented. C79.1 is verified; the complication diagnosis/external-cause mapping (DCS.XIX.7) is not.",
+        "Complication and procedure passages explicitly document rupture, vitreous prolapse, anterior vitrectomy and an unsutured sulcus lens are explicitly documented. C79.1 is verified; the complication diagnosis/external-cause mapping (DCS.XIX.7) is not.",
       blocks: "Final approval is blocked until the reference gate verifies complete coding coverage.",
       passageIds,
       factIds: factsCiting(facts, passageIds),
@@ -355,6 +355,10 @@ export function routeResult(
   return { value: "sent_to_review", reason: parts.join(" ") };
 }
 
+// References cited by the laterality amendment (right-side code, laterality
+// standard, Chapter Z secondary-only rule).
+export const CLARIFICATION_REFERENCE_IDS = ["opcs:Z94.2", "std:PCSZ2", "std:PRule7"];
+
 // Bounded, verified amendment after the curated laterality clarification:
 // append the right-side code to the lens group. Source evidence is kept.
 export function applyLateralityClarification(proposal: Proposal, presenterFactId: string): Proposal {
@@ -364,7 +368,7 @@ export function applyLateralityClarification(proposal: Proposal, presenterFactId
   target.codes.push({
     code: "Z94.2",
     factIds: [presenterFactId],
-    referenceIds: ["opcs:Z94.2", "std:PCSZ2", "std:PRule7"],
+    referenceIds: CLARIFICATION_REFERENCE_IDS,
     explanation: "Presenter applied the surgeon's clarification (right eye); laterality coded once, after the procedures on that site.",
   });
   target.label = target.label.replace(/\s*\(eye unresolved\)/i, "") + " — right eye (clarified)";

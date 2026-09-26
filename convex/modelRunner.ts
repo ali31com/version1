@@ -73,6 +73,7 @@ export const runAttempt = internalAction({
       attemptId,
       startedAt: context.startedAt,
       outcome,
+      prompt,
       rawOutput: rawOutput?.slice(0, 100_000),
       model,
       inputHash: hashText(prompt),
