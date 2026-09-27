@@ -6,7 +6,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 
 // Projector overlay with the shared join QR. Focus moves in once on open;
 // onClose must be stable so live count updates never reset focus.
-export function QrOverlay({ code, title, sessionId, onClose }: { code: string; title: string; sessionId: Id<"demoSessions">; onClose: () => void }) {
+export function QrOverlay({ code, sessionId, onClose }: { code: string; sessionId: Id<"demoSessions">; onClose: () => void }) {
   const overview = useQuery(api.presenter.overview, {});
   const session = overview?.sessions.find((s) => s._id === sessionId);
   const closeRef = useRef<HTMLButtonElement>(null);
@@ -36,11 +36,10 @@ export function QrOverlay({ code, title, sessionId, onClose }: { code: string; t
           Scan to build a cataract Episode
         </h2>
         <div className="rounded-2xl bg-white p-5 shadow-2xl">
-          <QRCodeSVG value={url} size={Math.min(440, window.innerHeight - 320)} level="M" marginSize={1} title={`Join link ${url}`} />
+          <QRCodeSVG value={url} size={Math.min(440, window.innerHeight - 480)} level="M" marginSize={1} title={`Join link ${url}`} />
         </div>
         <p className="font-mono text-lg break-all text-accent md:text-2xl">{url}</p>
         <p className="text-xl text-muted">
-          {title} ·{" "}
           <span className="font-mono text-3xl font-semibold text-text tabular-nums">{session?.submissionCount ?? 0}</span> submitted ·{" "}
           <span className="font-mono tabular-nums">{session?.participantCount ?? 0}</span> joined
         </p>

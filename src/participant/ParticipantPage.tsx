@@ -53,7 +53,6 @@ function PhoneShell({ children }: { children: ReactNode }) {
           <span className="flex items-center gap-2 font-semibold tracking-tight">
             <GemMark /> CodeGem
           </span>
-          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-medium text-amber-900">Synthetic demo data</span>
         </div>
       </header>
       <main className="mx-auto max-w-md px-5 pt-6 pb-16">{children}</main>
@@ -72,12 +71,16 @@ export function GemMark({ className = "h-5 w-5" }: { className?: string }) {
 }
 
 const STEP_COUNT = 10;
+const COMPLICATION_STEP = 5;
 
 function Builder({ token, view }: { token: string; view: View }) {
   const saveDraft = useMutation(api.participants.saveDraft);
   const submit = useMutation(api.participants.submit);
   const [draft, setDraft] = useState<Draft>(view.draft);
-  const [step, setStep] = useState<number>(Math.min(view.step, STEP_COUNT - 1));
+  const [step, setStep] = useState<number>(() => {
+    const saved = Math.min(view.step, STEP_COUNT - 1);
+    return saved === COMPLICATION_STEP && view.draft.side === "both" ? COMPLICATION_STEP + 1 : saved;
+  });
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [nameInput, setNameInput] = useState(view.draft.displayName ?? "");
@@ -87,10 +90,12 @@ function Builder({ token, view }: { token: string; view: View }) {
     return <p className="py-16 text-center text-slate-600">This demo has finished. Scan the current QR code to join the new one.</p>;
   }
 
-  const go = (next: number, patch: Draft = {}) => {
+  const go = (target: number, patch: Draft = {}) => {
     setError(null);
     const merged = { ...draft, ...patch };
     if (merged.side === "both") merged.complication = "none";
+    // Bilateral Episodes use the uncomplicated preset, so skip that step.
+    const next = target === COMPLICATION_STEP && merged.side === "both" ? (step < COMPLICATION_STEP ? target + 1 : target - 1) : target;
     setDraft(merged);
     setStep(next);
     saveDraft({ token, draft: patch, step: next }).catch((e: unknown) => {
@@ -104,19 +109,14 @@ function Builder({ token, view }: { token: string; view: View }) {
   switch (step) {
     case 0:
       body = (
-        <Question
-          eyebrow="Live clinical coding"
-          title="Build a synthetic cataract operation"
-          lead="Answer a few quick questions. Your operation note joins the presenter's coding Worklist, where Gemini Flash plays MedCAT and MedGemma to code it live."
-        >
+        <Question title="Build a synthetic cataract operation">
           <PrimaryButton onClick={() => go(1)}>Start</PrimaryButton>
-          <p className="mt-4 text-sm text-slate-500">Use a made-up name. Nothing you enter is real patient data.</p>
         </Question>
       );
       break;
     case 1:
       body = (
-        <Question eyebrow="Step 1" title="Choose a display name" lead="Shown on the projected Worklist. Use a nickname, not a real patient.">
+        <Question title="Choose a display name">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -143,7 +143,7 @@ function Builder({ token, view }: { token: string; view: View }) {
       break;
     case 2:
       body = (
-        <Question eyebrow="Step 2" title="Synthetic patient age" lead={`Any whole number from ${MIN_AGE} to ${MAX_AGE}. Age is cosmetic: it never decides the diagnosis.`}>
+        <Question title="Synthetic patient age">
           <form
             onSubmit={(e) => {
               e.preventDefault();
@@ -170,42 +170,31 @@ function Builder({ token, view }: { token: string; view: View }) {
       break;
     case 3:
       body = (
-        <Question eyebrow="Step 3" title="Which eye is operated on?">
+        <Question title="Which eye is operated on?">
           <Choices options={SIDE_OPTIONS} selected={draft.side} onChoose={(side) => go(4, { side })} />
         </Question>
       );
       break;
     case 4:
       body = (
-        <Question eyebrow="Step 4" title="What type of cataract?" lead="The note documents exactly the type you choose.">
+        <Question title="What type of cataract?">
           <Choices options={CONDITION_OPTIONS} selected={draft.condition} onChoose={(condition) => go(5, { condition })} />
         </Question>
       );
       break;
     case 5:
-      body =
-        draft.side === "both" ? (
-          <Question eyebrow="Step 5" title="Complication">
-            <div className="rounded-xl border border-teal-200 bg-teal-50 p-4 text-teal-950">
-              <p className="font-medium">Both eyes uses the uncomplicated preset.</p>
-              <p className="mt-1 text-sm">
-                Coding a complication on only one eye of a bilateral operation is not a verified scenario in this demo, so this question is skipped.
-              </p>
-            </div>
-            <PrimaryButton className="mt-5" onClick={() => go(6)}>Continue</PrimaryButton>
-          </Question>
-        ) : (
-          <Question eyebrow="Step 5" title="Was there an operative complication?">
-            <Choices options={COMPLICATION_OPTIONS} selected={draft.complication} onChoose={(complication) => go(6, { complication })} />
-          </Question>
-        );
+      body = (
+        <Question title="Was there an operative complication?">
+          <Choices options={COMPLICATION_OPTIONS} selected={draft.complication} onChoose={(complication) => go(6, { complication })} />
+        </Question>
+      );
       break;
     case 6:
     case 7:
     case 8: {
       const q = COMORBIDITY_QUESTIONS[step - 6];
       body = (
-        <Question eyebrow={`Step ${step} · Medical history`} title={q.title} lead={q.description}>
+        <Question title={q.title}>
           <Choices
             options={[
               { value: "yes", label: "Yes" },
@@ -221,7 +210,7 @@ function Builder({ token, view }: { token: string; view: View }) {
     }
     default:
       body = (
-        <Question eyebrow="Review" title="Check and submit" lead="You can change answers before submitting. After submission the Episode is frozen and sent for coding.">
+        <Question title="Check and submit">
           <Summary draft={draft} onEdit={(s) => go(s)} />
           <PrimaryButton
             className="mt-6"
@@ -262,12 +251,10 @@ function Builder({ token, view }: { token: string; view: View }) {
   );
 }
 
-function Question({ eyebrow, title, lead, children }: { eyebrow: string; title: string; lead?: string; children: ReactNode }) {
+function Question({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section aria-labelledby="q-title">
-      <p className="font-mono text-xs tracking-widest text-teal-700 uppercase">{eyebrow}</p>
-      <h1 id="q-title" className="mt-2 text-2xl leading-tight font-semibold tracking-tight">{title}</h1>
-      {lead && <p className="mt-2 text-slate-600">{lead}</p>}
+      <h1 id="q-title" className="text-2xl leading-tight font-semibold tracking-tight">{title}</h1>
       <div className="mt-6">{children}</div>
     </section>
   );
@@ -279,7 +266,7 @@ function Choices<V extends string>({
   onChoose,
   columns = false,
 }: {
-  options: readonly { value: V; label: string; hint?: string }[];
+  options: readonly { value: V; label: string }[];
   selected: string | undefined;
   onChoose: (value: V) => void;
   columns?: boolean;
@@ -299,7 +286,6 @@ function Choices<V extends string>({
             } ${columns ? "text-center" : ""}`}
           >
             <span className="block text-lg font-medium">{o.label}</span>
-            {o.hint && <span className="mt-0.5 block text-sm text-slate-500">{o.hint}</span>}
           </button>
         );
       })}
@@ -319,7 +305,7 @@ function PrimaryButton({ className = "", ...props }: React.ButtonHTMLAttributes<
 
 function Summary({ draft, onEdit }: { draft: Draft; onEdit: (step: number) => void }) {
   const yesNo = (v: boolean | undefined) => (v === undefined ? "Not answered" : v ? "Yes" : "No");
-  const rows: [string, string, number][] = [
+  const rows: [string, string, number | null][] = [
     ["Name", draft.displayName ?? "Not answered", 1],
     ["Age", draft.age !== undefined ? String(draft.age) : "Not answered", 2],
     ["Eye", SIDE_OPTIONS.find((o) => o.value === draft.side)?.label ?? "Not answered", 3],
@@ -327,7 +313,7 @@ function Summary({ draft, onEdit }: { draft: Draft; onEdit: (step: number) => vo
     [
       "Complication",
       draft.side === "both" ? "None (bilateral preset)" : (COMPLICATION_OPTIONS.find((o) => o.value === draft.complication)?.label ?? "Not answered"),
-      5,
+      draft.side === "both" ? null : 5,
     ],
     ["Type 2 diabetes", yesNo(draft.diabetes), 6],
     ["Hypertension", yesNo(draft.hypertension), 7],
@@ -340,9 +326,11 @@ function Summary({ draft, onEdit }: { draft: Draft; onEdit: (step: number) => vo
           <dt className="text-sm text-slate-500">{label}</dt>
           <dd className="flex items-center gap-3 text-right font-medium">
             {value}
-            <button type="button" onClick={() => onEdit(s)} className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline" aria-label={`Change ${label}`}>
-              Change
-            </button>
+            {s !== null && (
+              <button type="button" onClick={() => onEdit(s)} className="text-sm font-medium text-teal-700 underline-offset-2 hover:underline" aria-label={`Change ${label}`}>
+                Change
+              </button>
+            )}
           </dd>
         </div>
       ))}

@@ -2,7 +2,7 @@
 
 An audience builds synthetic Episodes that appear on a live clinical coding Worklist. Gemini Flash performs the MedCAT and MedGemma roles, and the presenter can inspect each Episode and its coding result.
 
-The owner approved the [plan](docs/plans/live-cataract-demo.md), which governs the terms and defaults below. Implementation was subsequently cancelled; see the [agent pickup guide](docs/START-HERE.md). The PRD remains proposal context.
+The owner approved the [plan](docs/plans/live-cataract-demo.md), which governs the terms and defaults below. Implementation was subsequently cancelled; see the [agent pickup guide](docs/START-HERE.md). The PRD remains proposal context. A later [presentation amendment](docs/plans/live-cataract-demo.md#amendment-presentation-clean-up-27-september-2026) hides provider and model text in the UI; the roles below are unchanged.
 
 ## Language
 

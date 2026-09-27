@@ -16,9 +16,7 @@ export function ParticipantResult({ episode, paused }: { episode: Episode; pause
       <section>
         <p className="font-mono text-xs tracking-widest text-teal-700 uppercase">Your Episode · {episode.worklistId}</p>
         <h1 className="mt-2 text-2xl font-semibold tracking-tight">{episode.summary}</h1>
-        <p className="mt-1 text-slate-600">
-          {episode.laterality} · submitted and frozen
-        </p>
+        <p className="mt-1 text-slate-600">{episode.laterality}</p>
         <StatusBanner episode={episode} paused={paused} elapsed={elapsed} />
       </section>
 
@@ -31,7 +29,6 @@ export function ParticipantResult({ episode, paused }: { episode: Episode; pause
               <li key={s.stage} className="flex items-center gap-3">
                 <StageDot status={state} />
                 <span className={state === "pending" ? "text-slate-400" : "text-slate-900"}>{s.label}</span>
-                <span className="ml-auto text-xs text-slate-500">{s.role}</span>
               </li>
             );
           })}
@@ -83,7 +80,6 @@ export function ParticipantResult({ episode, paused }: { episode: Episode; pause
       {episode.facts.length > 0 && (
         <section aria-labelledby="facts-title">
           <h2 id="facts-title" className="text-lg font-semibold">Clinical facts found</h2>
-          <p className="text-sm text-slate-500">Extracted by Gemini Flash in the MedGemma role, each linked to the note.</p>
           <ul className="mt-3 space-y-2">
             {episode.facts.map((f) => (
               <li key={f.id} className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm">
@@ -110,7 +106,6 @@ export function ParticipantResult({ episode, paused }: { episode: Episode; pause
           </div>
         </details>
       )}
-      <p className="text-center text-xs text-slate-500">Only the presenter can resolve questions or approve coding. This page updates live.</p>
     </div>
   );
 }
@@ -122,12 +117,11 @@ function StatusBanner({ episode, paused, elapsed }: { episode: Episode; paused: 
   if (episode.processing === "failed") {
     tone = "bg-red-50 text-red-900 border border-red-200";
     title = "A processing stage failed";
-    detail = `${episode.failure ?? ""} The presenter can retry it; no prepared result is substituted.`;
+    detail = episode.failure ?? null;
   } else if (episode.processing !== "completed") {
     if (paused && episode.processing === "queued") {
       tone = "bg-amber-50 text-amber-900 border border-amber-200";
       title = "Processing paused by the presenter";
-      detail = "Your Episode is safely queued and will continue when processing resumes.";
     } else if (episode.processing === "queued") {
       title = `Queued for ${stageLabel(episode.currentStage)}`;
       detail = episode.queueAhead ? `${episode.queueAhead} request${episode.queueAhead === 1 ? "" : "s"} ahead of yours.` : "Waiting for a free processing slot.";
@@ -138,15 +132,12 @@ function StatusBanner({ episode, paused, elapsed }: { episode: Episode; paused: 
   } else if (episode.review === "approved") {
     tone = "bg-emerald-50 text-emerald-950 border border-emerald-200";
     title = "✓ Approved by the presenter";
-    detail = "Final coding saved after review.";
   } else if (episode.result === "auto_coded") {
     tone = "bg-emerald-50 text-emerald-950 border border-emerald-200";
     title = "✓ Auto-coded";
-    detail = episode.reason;
   } else {
     tone = "bg-amber-50 text-amber-950 border border-amber-200";
     title = "? Sent to review";
-    detail = episode.reason;
   }
   return (
     <div className={`mt-4 rounded-xl px-4 py-3 ${tone}`} role="status">
