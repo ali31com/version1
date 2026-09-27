@@ -8,7 +8,18 @@ import { formatDuration, useNow } from "../lib/time";
 
 type Row = FunctionReturnType<typeof api.presenter.worklist>[number];
 
-export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoSessions">; onSelect: (id: Id<"episodes">) => void; paused: boolean }) {
+// compact drops the secondary columns while the QR panel shares the screen.
+export function Worklist({
+  sessionId,
+  onSelect,
+  paused,
+  compact = false,
+}: {
+  sessionId: Id<"demoSessions">;
+  onSelect: (id: Id<"episodes">) => void;
+  paused: boolean;
+  compact?: boolean;
+}) {
   const rows = useQuery(api.presenter.worklist, { sessionId });
   const seen = useRef<Set<string> | null>(null);
   const [arrived, setArrived] = useState<Set<string>>(new Set());
@@ -40,7 +51,7 @@ export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoS
   return (
     <section
       aria-label="Worklist"
-      className="flex min-h-0 flex-1 flex-col bg-surface"
+      className="flex min-h-0 min-w-0 flex-1 flex-col bg-surface"
     >
       <div className="border-b border-line p-3">
         <div className="flex items-baseline justify-between gap-3">
@@ -62,11 +73,15 @@ export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoS
             <thead className="sticky top-0 z-10 bg-surface text-sm text-muted uppercase">
               <tr className="border-b border-line">
                 <th className="px-3 py-2 font-medium">Episode</th>
-                <th className="px-3 py-2 font-medium">Age</th>
-                <th className="px-3 py-2 font-medium">Scenario</th>
-                <th className="px-3 py-2 font-medium">Side</th>
+                {!compact && (
+                  <>
+                    <th className="px-3 py-2 font-medium">Age</th>
+                    <th className="px-3 py-2 font-medium">Scenario</th>
+                    <th className="px-3 py-2 font-medium">Side</th>
+                  </>
+                )}
                 <th className="px-3 py-2 font-medium">Stage</th>
-                <th className="px-3 py-2 text-right font-medium">Elapsed</th>
+                {!compact && <th className="px-3 py-2 text-right font-medium">Elapsed</th>}
                 <th className="px-3 py-2 font-medium">Coding result</th>
               </tr>
             </thead>
@@ -83,17 +98,23 @@ export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoS
                     </button>
                     <span className="font-mono text-xs text-muted">{r.worklistId}</span>
                   </td>
-                  <td className="px-3 py-3 tabular-nums">{r.age}</td>
-                  <td className="max-w-[22rem] truncate px-3 py-3 text-muted" title={r.summary}>
-                    {r.summary}
-                  </td>
-                  <td className="px-3 py-3">{r.laterality}</td>
+                  {!compact && (
+                    <>
+                      <td className="px-3 py-3 tabular-nums">{r.age}</td>
+                      <td className="max-w-[22rem] truncate px-3 py-3 text-muted" title={r.summary}>
+                        {r.summary}
+                      </td>
+                      <td className="px-3 py-3">{r.laterality}</td>
+                    </>
+                  )}
                   <td className="px-3 py-3 whitespace-nowrap">
                     <ProcessingLabel row={r} paused={paused} />
                   </td>
-                  <td className="px-3 py-3 text-right">
-                    <Elapsed row={r} />
-                  </td>
+                  {!compact && (
+                    <td className="px-3 py-3 text-right">
+                      <Elapsed row={r} />
+                    </td>
+                  )}
                   <td className="px-3 py-3">
                     <ResultBadge row={r} />
                   </td>
