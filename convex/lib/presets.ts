@@ -70,8 +70,7 @@ export function validateSelections(draft: Draft): {
   }
   if (draft.side === undefined) errors.push({ field: "side", message: "Choose the operated eye." });
   if (draft.condition === undefined) errors.push({ field: "condition", message: "Choose the cataract type." });
-  const complication: Complication | undefined =
-    draft.side === "both" ? "none" : draft.complication;
+  const complication = draft.complication;
   if (complication === undefined) {
     errors.push({ field: "complication", message: "Choose whether there was a complication." });
   }
@@ -95,9 +94,6 @@ export function validateSelections(draft: Draft): {
 }
 
 export function audiencePreset(selections: Selections): Preset {
-  if (selections.side === "both" && selections.complication !== "none") {
-    throw new Error("Bilateral surgery supports only the uncomplicated preset.");
-  }
   return { presetId: "audience", selections, documentedSide: selections.side, irisHooks: false };
 }
 
@@ -235,7 +231,31 @@ export function generateSourceDocument(
   sections.push({ heading: "Operative findings", passages: [[`${findings} ${pupil}`, "current"]] });
 
   const performed: [string, PassageContext][] = [];
-  if (s.side === "both") {
+  if (s.side === "both" && s.complication === "pcr") {
+    // The rupture is in the second eye: an uncomplicated first eye is what
+    // allows the same-session second eye to proceed.
+    performed.push([
+      "Right eye operated first, then the left eye in the same operative session with a separate instrument set and fresh preparation.",
+      "current",
+    ]);
+    performed.push([
+      "Right eye: temporal 2.4 mm clear corneal incision, continuous curvilinear capsulorhexis, phacoemulsification of the nucleus and irrigation/aspiration of cortex. Single-piece hydrophobic acrylic posterior chamber intraocular lens, +21.0 D, implanted in the capsular bag without sutures. Uncomplicated.",
+      "current",
+    ]);
+    performed.push([
+      "Left eye: temporal 2.4 mm clear corneal incision, continuous curvilinear capsulorhexis, phacoemulsification of the nucleus using a stop-and-chop technique. During removal of the final nuclear fragment a posterior capsule rupture occurred, with vitreous prolapse into the anterior chamber.",
+      "current",
+    ]);
+    performed.push([
+      "Anterior vitrectomy performed by an anterior (limbal) approach; the anterior chamber was cleared of vitreous and residual cortex removed.",
+      "current",
+    ]);
+    performed.push([
+      "Anterior capsule rim assessed as providing adequate support. Three-piece posterior chamber intraocular lens, +21.5 D, placed in the ciliary sulcus of the left eye without sutures. Wounds confirmed watertight.",
+      "current",
+    ]);
+    performed.push(["Intracameral cefuroxime given to each eye.", "current"]);
+  } else if (s.side === "both") {
     performed.push([
       "Right eye operated first, then the left eye in the same operative session with a separate instrument set and fresh preparation.",
       "current",
@@ -293,7 +313,9 @@ export function generateSourceDocument(
     passages: [
       s.complication === "pcr"
         ? [
-            `Posterior capsule rupture with vitreous loss during phacoemulsification, ${eye}; managed with anterior vitrectomy and sulcus intraocular lens placement.`,
+            s.side === "both"
+              ? "Posterior capsule rupture with vitreous loss during phacoemulsification, left eye; managed with anterior vitrectomy and sulcus intraocular lens placement. Right eye uncomplicated."
+              : `Posterior capsule rupture with vitreous loss during phacoemulsification, ${eye}; managed with anterior vitrectomy and sulcus intraocular lens placement.`,
             "current",
           ]
         : ["None.", "current"],

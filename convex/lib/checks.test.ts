@@ -36,11 +36,10 @@ describe("routing", () => {
     const p = audiencePreset({ ...routine.selections, side: "both", diabetes: true, hypertension: true, glaucoma: true });
     expect(pipeline(p).route.value).toBe("auto_coded");
   });
-  test("mature white routes to a teaching confirmation", () => {
+  test("mature white auto-codes to H26.9", () => {
     const r = pipeline(audiencePreset({ ...routine.selections, condition: "mature" }));
-    expect(r.route.value).toBe("sent_to_review");
-    expect(r.questions.map((q) => [q.kind, q.basis])).toEqual([["diagnosis_confirmation", "teaching_policy"]]);
-    expect(r.checks.every((c) => c.status === "passed")).toBe(true);
+    expect(r.route.value).toBe("auto_coded");
+    expect(r.base.proposal.diagnoses[0].code).toBe("H26.9");
   });
   test("contradictory laterality withholds Z94 and resolves with the curated clarification", () => {
     const preset = teachingPreset("teaching_contradictory_laterality");
@@ -55,12 +54,51 @@ describe("routing", () => {
     expect(checks.filter((c) => c.status !== "passed")).toEqual([]);
     expect(amended.procedureGroups[0].codes.map((c) => c.code)).toEqual(["C75.1", "C71.2", "Z94.2"]);
   });
-  test("capsule rupture is sent to review with an unanswerable completeness question", () => {
-    const r = pipeline(audiencePreset({ ...routine.selections, complication: "pcr" }));
+  test("unilateral capsule rupture auto-codes with T81.2, Y60.0 and C79.1", () => {
+    const r = pipeline(audiencePreset({ ...routine.selections, complication: "pcr", diabetes: true, glaucoma: true }));
+    expect(r.checks.filter((c) => c.status !== "passed")).toEqual([]);
+    expect(r.route.value).toBe("auto_coded");
+    expect(r.base.proposal.procedureGroups[0].codes.map((c) => c.code)).toEqual(["C75.1", "C71.2", "C79.1", "Z94.3"]);
+  });
+  const bilateralPcr = audiencePreset({ ...routine.selections, side: "both", complication: "pcr", hypertension: true });
+  test("bilateral capsule rupture without diabetes or glaucoma auto-codes per eye", () => {
+    const r = pipeline(bilateralPcr);
+    expect(r.checks.filter((c) => c.status !== "passed")).toEqual([]);
+    expect(r.route.value).toBe("auto_coded");
+    expect(r.base.proposal.procedureGroups.map((g) => g.codes.map((c) => c.code))).toEqual([
+      ["C75.1", "C71.2", "Z94.2"],
+      ["C75.1", "C71.2", "C79.1", "Z94.3"],
+    ]);
+  });
+  test("bilateral capsule rupture also accepts one bilateral group plus the left-eye vitrectomy", () => {
+    const r = pipeline(bilateralPcr, (p) => {
+      const byCode = new Map(p.procedureGroups.flatMap((g) => g.codes).map((c) => [c.code, c]));
+      const z1 = { ...byCode.get("Z94.2")!, code: "Z94.1", referenceIds: ["opcs:Z94.1"] };
+      return {
+        ...p,
+        procedureGroups: [
+          { label: "Both eyes", codes: [byCode.get("C75.1")!, byCode.get("C71.2")!, z1] },
+          { label: "Left eye", codes: [byCode.get("C79.1")!, byCode.get("Z94.3")!] },
+        ],
+      };
+    });
+    expect(r.checks.filter((c) => c.status !== "passed")).toEqual([]);
+    expect(r.route.value).toBe("auto_coded");
+  });
+  test.each([
+    ["diabetes", { diabetes: true }],
+    ["glaucoma", { glaucoma: true }],
+  ] as const)("bilateral capsule rupture with %s goes to review and resolves", (_name, extra) => {
+    const preset = audiencePreset({ ...bilateralPcr.selections, ...extra });
+    const r = pipeline(preset);
     expect(r.route.value).toBe("sent_to_review");
-    const q = r.questions.find((x) => x.kind === "completeness")!;
-    expect(q.answerable).toBe(false);
-    expect(r.checks.find((c) => c.id === "C7")!.status).toBe("blocked");
+    expect(r.checks.filter((c) => c.status !== "passed")).toEqual([]);
+    expect(r.questions.map((q) => [q.key, q.basis, q.answerable])).toEqual([["complicated_bilateral", "teaching_policy", true]]);
+    expect(r.questions[0].options.map((o) => o.id)).toEqual(["confirm_coding"]);
+  });
+  test("bilateral uncomplicated with diabetes and glaucoma still auto-codes", () => {
+    const p = audiencePreset({ ...routine.selections, side: "both", diabetes: true, glaucoma: true });
+    expect(pipeline(p).route.value).toBe("auto_coded");
   });
 });
 

@@ -1,7 +1,7 @@
 // Stages 6–7: deterministic uncertainty handling, checks and routing.
 
 import type { ClinicalFact, Conflict, Proposal, ProposedCode } from "./contracts";
-import { expectedCoding, lateralityCode } from "./expected";
+import { expectedCoding } from "./expected";
 import type { Passage, Preset, Side } from "./presets";
 import { classificationOf, referenceForCode } from "./references";
 
@@ -51,6 +51,14 @@ function passagesMatching(passages: Passage[], pattern: RegExp): string[] {
 function factsCiting(facts: ClinicalFact[], passageIds: string[]): string[] {
   const set = new Set(passageIds);
   return facts.filter((f) => f.passageIds.some((id) => set.has(id))).map((f) => f.id);
+}
+
+// The only audience scenario that goes to review by policy: bilateral
+// surgery with a complication in a patient with diabetes or glaucoma. Every
+// other audience scenario auto-codes unless a check fails.
+export function isReviewScenario(preset: Preset): boolean {
+  const s = preset.selections;
+  return preset.presetId === "audience" && s.side === "both" && s.complication === "pcr" && (s.diabetes || s.glaucoma);
 }
 
 export function deriveQuestions(input: Omit<CheckInput, "answers" | "rejectedAnnotations">): QuestionSpec[] {
@@ -122,44 +130,27 @@ export function deriveQuestions(input: Omit<CheckInput, "answers" | "rejectedAnn
     });
   }
 
-  if (preset.selections.condition === "mature") {
-    const passageIds = passagesMatching(passages, /mature white/i);
+  if (isReviewScenario(preset)) {
+    const s = preset.selections;
+    const comorbid = joinAnd([s.diabetes && "diabetes", s.glaucoma && "glaucoma"].filter((x): x is string => Boolean(x)));
+    const passageIds = passagesMatching(passages, /rupture|vitrectomy|sulcus|Right eye:|diabetes|glaucoma/i);
     questions.push({
-      key: "mature_confirmation",
-      kind: "diagnosis_confirmation",
+      key: "complicated_bilateral",
+      kind: "completeness",
       basis: "teaching_policy",
-      question: "Confirm H26.9 rather than an H25 age-related cataract code.",
-      revisited:
-        "Indication and findings passages document a mature white cataract. DCS.VII.1 points to H26.9, overriding the most likely clinical category even for an older patient.",
-      blocks: "Primary diagnosis is proposed but not confirmed. This confirmation is a demo teaching policy, not a national coding requirement.",
+      question: `Confirm the coding for bilateral surgery with a posterior capsule rupture in a patient with ${comorbid}.`,
+      revisited: `The left (second) eye had a posterior capsule rupture managed with anterior vitrectomy and a sulcus lens; the right eye was uncomplicated. The rupture is coded T81.2 with Y60.0 after it (DCS.XIX.7, DCS.XX.8). PCSZ2 does not settle whether the shared procedures form one bilateral group or one group per eye. The documented ${comorbid} is coded as a comorbidity, not as a cause of the rupture.`,
+      blocks: "Final coding waits for presenter confirmation. Reviewing complicated bilateral surgery with diabetes or glaucoma is a demo teaching policy, not a national coding requirement.",
       passageIds,
       factIds: factsCiting(facts, passageIds),
       options: [
         {
-          id: "confirm_h26_9",
-          label: "Confirm H26.9 (DCS.VII.1)",
-          detail: "Records the presenter's confirmation of the standard override.",
+          id: "confirm_coding",
+          label: "Confirm complication and procedure grouping",
+          detail: "Records the presenter's confirmation of T81.2 + Y60.0 and the proposed procedure grouping.",
         },
       ],
       answerable: true,
-    });
-  }
-
-  if (preset.selections.complication === "pcr") {
-    const passageIds = passagesMatching(passages, /rupture|vitrectomy|vitreous|sulcus/i);
-    questions.push({
-      key: "completeness",
-      kind: "completeness",
-      basis: "reference_gate",
-      question:
-        "Is the complication code set complete? The posterior capsule rupture diagnosis, its external cause and the combined procedure sequence are not verified in the demo reference library.",
-      revisited:
-        "Complication and procedure passages explicitly document rupture, vitreous prolapse, anterior vitrectomy and an unsutured sulcus lens are explicitly documented. C79.1 is verified; the complication diagnosis/external-cause mapping (DCS.XIX.7) is not.",
-      blocks: "Final approval is blocked until the reference gate verifies complete coding coverage.",
-      passageIds,
-      factIds: factsCiting(facts, passageIds),
-      options: [],
-      answerable: false,
     });
   }
   return questions;
@@ -228,10 +219,10 @@ export function runChecks(input: CheckInput): Check[] {
   });
 
   const seqProblems: string[] = [];
-  const seen = new Set<string>();
-  for (const c of codes) {
-    if (seen.has(c.code)) seqProblems.push(`${c.code} appears more than once`);
-    seen.add(c.code);
+  // A code may repeat across procedure groups (the same operation on each
+  // eye), never within one group or among the diagnoses.
+  for (const list of [proposal.diagnoses.map((c) => c.code), ...proposal.procedureGroups.map((g) => g.codes.map((c) => c.code))]) {
+    for (const code of list.filter((c, i) => list.indexOf(c) !== i)) seqProblems.push(`${code} appears more than once`);
   }
   for (const g of proposal.procedureGroups) {
     const list = g.codes.map((c) => c.code);
@@ -256,18 +247,23 @@ export function runChecks(input: CheckInput): Check[] {
   });
 
   const side = resolvedSide(preset, input.answers);
-  const zCodes = proposal.procedureGroups.flatMap((g) => g.codes).map((c) => c.code).filter((c) => LATERALITY_CODES.includes(c));
+  const expected = expectedCoding(preset, side);
+  const groupCodes = proposal.procedureGroups.map((g) => g.codes.map((c) => c.code));
+  const grouping = expected.groupings.find((gr) => sameGroups(gr, groupCodes)) ?? expected.groupings[0];
+  const zCodes = groupCodes.flat().filter((c) => LATERALITY_CODES.includes(c));
   let lateralityStatus: CheckStatus = "passed";
   let lateralityDetail: string;
   if (side) {
-    const wanted = lateralityCode(side);
-    if (zCodes.length === 1 && zCodes[0] === wanted) {
-      lateralityDetail = `${wanted} agrees with the documented ${side === "both" ? "bilateral" : side}-sided operation${preset.documentedSide ? "" : " (presenter clarification)"}.`;
+    const accepted = expected.groupings.map((gr) => gr.flat().filter((c) => LATERALITY_CODES.includes(c)));
+    const wanted = grouping.flat().filter((c) => LATERALITY_CODES.includes(c)).join(" + ");
+    const sideText = side === "both" ? "bilateral" : `${side}-sided`;
+    if (accepted.some((z) => z.length === zCodes.length && multisetMinus(z, zCodes).length === 0)) {
+      lateralityDetail = `${zCodes.join(" + ")} agree${zCodes.length > 1 ? "" : "s"} with the documented ${sideText} operation${preset.documentedSide ? "" : " (presenter clarification)"}.`;
     } else {
       lateralityStatus = "failed";
       lateralityDetail =
         zCodes.length === 0
-          ? `Documented ${side} side but no laterality code; expected ${wanted}.`
+          ? `Documented ${sideText} operation but no laterality code; expected ${wanted}.`
           : `Laterality ${zCodes.join(", ")} disagrees with the documented side (expected ${wanted}).`;
     }
   } else if (zCodes.length > 0) {
@@ -289,37 +285,28 @@ export function runChecks(input: CheckInput): Check[] {
         : `Expected exactly one primary diagnosis; found ${primaries.length}.`,
   });
 
-  const expected = expectedCoding(preset, side);
   const coverage: string[] = [];
   const primary = primaries[0]?.code;
   if (primary !== expected.primary) coverage.push(`primary should be ${expected.primary}${primary ? `, not ${primary}` : ""}`);
   const secondary = proposal.diagnoses.filter((d) => d.position === "secondary").map((d) => d.code);
   const missingSecondary = multisetMinus(expected.secondary, secondary);
   const extraSecondary = multisetMinus(secondary, expected.secondary);
-  if (missingSecondary.length) coverage.push(`missing comorbidity ${missingSecondary.join(", ")}`);
+  if (missingSecondary.length) coverage.push(`missing secondary diagnosis ${missingSecondary.join(", ")}`);
   if (extraSecondary.length) coverage.push(`unsupported diagnosis ${extraSecondary.join(", ")}`);
-  const procedures = proposal.procedureGroups.flatMap((g) => g.codes.map((c) => c.code));
-  const missingProc = multisetMinus(expected.procedures, procedures);
-  const extraProc = multisetMinus(procedures, expected.procedures);
+  const procedures = groupCodes.flat();
+  const wantedProcedures = grouping.flat();
+  const missingProc = multisetMinus(wantedProcedures, procedures);
+  const extraProc = multisetMinus(procedures, wantedProcedures);
   if (missingProc.length) coverage.push(`missing procedure ${missingProc.join(", ")}`);
   if (extraProc.length) coverage.push(`unexpected procedure ${extraProc.join(", ")}`);
-  if (
-    expected.verified &&
-    missingProc.length === 0 &&
-    extraProc.length === 0 &&
-    procedures.join(",") !== expected.procedures.join(",")
-  ) {
-    coverage.push(`procedure sequence should be ${expected.procedures.join(" → ")}`);
+  if (missingProc.length === 0 && extraProc.length === 0 && !sameGroups(grouping, groupCodes)) {
+    coverage.push(`procedure sequence should be ${grouping.map((g) => g.join(" → ")).join("; ")}`);
   }
-  let coverageStatus: CheckStatus = coverage.length === 0 ? "passed" : "failed";
-  let coverageDetail =
+  const coverageStatus: CheckStatus = coverage.length === 0 ? "passed" : "failed";
+  const coverageDetail =
     coverage.length === 0
       ? "Diagnoses, comorbidities and ordered procedures match the verified coverage for this supported scenario."
       : `Supported-scenario coverage: ${coverage.join("; ")}.`;
-  if (!expected.verified) {
-    coverageStatus = "blocked";
-    coverageDetail = `${expected.gaps.join(" ")}${coverage.length ? ` Also: ${coverage.join("; ")}.` : ""}`;
-  }
   checks.push({ id: "C7", label: "Supported-scenario coverage", status: coverageStatus, detail: coverageDetail });
 
   const lateralityConflict = conflicts.some((c) => c.topic === "laterality");
@@ -385,6 +372,17 @@ function multisetMinus(a: string[], b: string[]): string[] {
     else out.push(x);
   }
   return out;
+}
+
+// Same procedure groups, each in order; the groups themselves may come in
+// any order.
+function sameGroups(expected: string[][], actual: string[][]): boolean {
+  const key = (g: string[]) => g.join(",");
+  return expected.length === actual.length && multisetMinus(expected.map(key), actual.map(key)).length === 0;
+}
+
+function joinAnd(words: string[]): string {
+  return words.length <= 1 ? words.join("") : `${words.slice(0, -1).join(", ")} and ${words[words.length - 1]}`;
 }
 
 function unique(values: string[]): string[] {
