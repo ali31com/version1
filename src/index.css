@@ -31,6 +31,11 @@ body,
   min-height: 100%;
 }
 
+/* Presenter TV scale: every rem-based size grows with the root. */
+html.tv {
+  font-size: 150%;
+}
+
 body {
   margin: 0;
   font-family: var(--font-sans);

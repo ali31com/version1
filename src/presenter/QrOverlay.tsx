@@ -36,7 +36,7 @@ export function QrOverlay({ code, title, sessionId, onClose }: { code: string; t
           Scan to build a cataract Episode
         </h2>
         <div className="rounded-2xl bg-white p-5 shadow-2xl">
-          <QRCodeSVG value={url} size={Math.min(440, window.innerHeight - 320)} level="M" marginSize={1} title={`Join link ${url}`} />
+          <QRCodeSVG value={url} size={Math.min(440, window.innerHeight - 480)} level="M" marginSize={1} title={`Join link ${url}`} />
         </div>
         <p className="font-mono text-lg break-all text-accent md:text-2xl">{url}</p>
         <p className="text-xl text-muted">

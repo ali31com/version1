@@ -72,11 +72,11 @@ export function PaperNote({
                     isWarn ? "bg-mark-warning" : isHit ? "bg-mark" : "hover:bg-stone-200/60"
                   } ${isSel ? "ring-2 ring-teal-600" : ""}`}
                 >
-                  <span className="pt-0.5 font-mono text-[11px] text-stone-400 group-hover:text-stone-600">{p.id.split(".").pop()}</span>
-                  <span className="text-[15px]">
+                  <span className="pt-0.5 font-mono text-xs text-stone-400 group-hover:text-stone-600">{p.id.split(".").pop()}</span>
+                  <span className="text-base">
                     {text}
                     {p.context !== "current" && (
-                      <span className="ml-2 align-middle font-mono text-[10px] text-stone-400 uppercase">{p.context}</span>
+                      <span className="ml-2 align-middle font-mono text-xs text-stone-400 uppercase">{p.context}</span>
                     )}
                   </span>
                 </button>

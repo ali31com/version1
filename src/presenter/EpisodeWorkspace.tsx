@@ -266,12 +266,12 @@ function StageRail({ stages, attempts }: { stages: NonNullable<Detail["run"]>["s
               <p className={`text-xs font-medium ${status === "pending" ? "text-muted" : "text-text"}`}>
                 <span className="text-muted">{i + 1}.</span> {s.label}
               </p>
-              <p className="truncate text-[11px] text-muted">
+              <p className="truncate text-xs text-muted">
                 {status}
                 {dur !== null && s.stage !== "packet" && ` · ${formatDuration(dur)}`}
                 {tries.length > 1 && ` · ${tries.length} attempts`}
               </p>
-              <p className="truncate text-[10px] text-muted/80">{s.role}</p>
+              <p className="truncate text-xs text-muted/80">{s.role}</p>
             </div>
           </li>
         );
@@ -389,7 +389,7 @@ function CodePill({ code, tag, selected, onClick, dim = false }: { code: string;
     >
       <span className="w-14 shrink-0 font-mono text-base font-bold text-accent">{code}</span>
       <span className="flex-1 text-sm">{codeTitle(code)}</span>
-      {tag && <span className="font-mono text-[11px] text-muted uppercase">{tag}</span>}
+      {tag && <span className="font-mono text-xs text-muted uppercase">{tag}</span>}
     </button>
   );
 }
@@ -474,7 +474,7 @@ function FactCard({ fact, selected, onClick }: { fact: Fact; selected: boolean; 
       aria-pressed={selected}
       className={`block w-full rounded-lg border px-3 py-2 text-left ${selected ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"}`}
     >
-      <span className="flex items-center gap-2 font-mono text-[11px] uppercase">
+      <span className="flex items-center gap-2 font-mono text-xs uppercase">
         <span className="text-muted">{fact.id}</span>
         <span className="text-accent">{fact.kind}</span>
         {fact.laterality !== "not_applicable" && <span className="text-muted">· {fact.laterality}</span>}
@@ -505,7 +505,7 @@ function HintsPanel({ detail, selection, onSelect }: { detail: Detail; selection
               title={`“${a.span}” in ${a.passageId}`}
               className={`rounded-md border px-2 py-1 text-left text-xs ${sel ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"} ${a.status === "negated" ? "line-through decoration-muted" : ""}`}
             >
-              <span className="text-accent">{a.concept}</span> <span className="font-mono text-[10px] text-muted uppercase">{a.category}{a.status !== "affirmed" && ` · ${a.status}`}</span>
+              <span className="text-accent">{a.concept}</span> <span className="font-mono text-xs text-muted uppercase">{a.category}{a.status !== "affirmed" && ` · ${a.status}`}</span>
             </button>
           );
         })}
@@ -538,7 +538,7 @@ function ReferencesPanel({ refs }: { refs: Detail["references"] }) {
 function ReferenceCard({ r }: { r: Detail["references"][number] }) {
   return (
     <div className="rounded-lg border border-line bg-raised px-3 py-2">
-      <p className="font-mono text-[11px] text-muted">
+      <p className="font-mono text-xs text-muted">
         {r.source}
         {r.page && ` · p.${r.page}`}
       </p>
@@ -785,7 +785,7 @@ function Inspector({
 function Block({ label, children }: { label: string; children: ReactNode }) {
   return (
     <div>
-      <p className="mb-1 text-[11px] font-semibold tracking-wide text-muted uppercase">{label}</p>
+      <p className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">{label}</p>
       <div className="space-y-1">{children}</div>
     </div>
   );

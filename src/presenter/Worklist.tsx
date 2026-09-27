@@ -159,7 +159,7 @@ export function Worklist({
                     <button type="button" onClick={() => onSelect(r._id)} className="font-mono font-semibold text-accent hover:underline">
                       {r.worklistId}
                     </button>
-                    {r.origin === "presenter" && <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-[10px] text-muted uppercase">Teaching</span>}
+                    {r.origin === "presenter" && <span className="ml-2 rounded bg-white/10 px-1.5 py-0.5 text-xs text-muted uppercase">Teaching</span>}
                   </td>
                   <td className="max-w-[12rem] truncate px-3 py-2.5">{r.displayName}</td>
                   <td className="px-3 py-2.5 tabular-nums">{r.age}</td>

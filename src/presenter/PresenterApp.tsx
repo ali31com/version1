@@ -23,6 +23,11 @@ export function PresenterApp() {
   const sessionId = viewedSession ?? overview?.activeSessionId ?? null;
   const session = overview?.sessions.find((s) => s._id === sessionId) ?? null;
 
+  useEffect(() => {
+    document.documentElement.classList.add("tv");
+    return () => document.documentElement.classList.remove("tv");
+  }, []);
+
   const selectEpisode = useCallback((id: Id<"episodes"> | null) => {
     navigate(id ? `/?e=${id}` : "/", { replace: false });
   }, []);
