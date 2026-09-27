@@ -62,7 +62,6 @@ export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoS
             <thead className="sticky top-0 z-10 bg-surface text-sm text-muted uppercase">
               <tr className="border-b border-line">
                 <th className="px-3 py-2 font-medium">Episode</th>
-                <th className="px-3 py-2 font-medium">Name</th>
                 <th className="px-3 py-2 font-medium">Age</th>
                 <th className="px-3 py-2 font-medium">Scenario</th>
                 <th className="px-3 py-2 font-medium">Side</th>
@@ -78,12 +77,12 @@ export function Worklist({ sessionId, onSelect, paused }: { sessionId: Id<"demoS
                   onClick={() => onSelect(r._id)}
                   className={`cursor-pointer border-b border-line hover:bg-white/[0.03] ${arrived.has(r._id) ? "animate-arrive" : ""}`}
                 >
-                  <td className="px-3 py-3">
-                    <button type="button" onClick={() => onSelect(r._id)} className="font-mono font-semibold text-accent hover:underline">
-                      {r.worklistId}
+                  <td className="max-w-[16rem] px-3 py-3">
+                    <button type="button" onClick={() => onSelect(r._id)} className="block max-w-full truncate text-lg font-semibold text-accent hover:underline">
+                      {r.displayName}
                     </button>
+                    <span className="font-mono text-xs text-muted">{r.worklistId}</span>
                   </td>
-                  <td className="max-w-[12rem] truncate px-3 py-3">{r.displayName}</td>
                   <td className="px-3 py-3 tabular-nums">{r.age}</td>
                   <td className="max-w-[22rem] truncate px-3 py-3 text-muted" title={r.summary}>
                     {r.summary}
