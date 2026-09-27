@@ -7,7 +7,7 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { GemMark } from "../participant/ParticipantPage";
 import { navigate, useLocation } from "../lib/router";
 import { EpisodeWorkspace } from "./EpisodeWorkspace";
-import { QrOverlay } from "./QrOverlay";
+import { QrPanel } from "./QrPanel";
 import { Worklist } from "./Worklist";
 
 export type Overview = FunctionReturnType<typeof api.presenter.overview>;
@@ -45,7 +45,8 @@ export function PresenterApp() {
           setViewedSession(id);
           selectEpisode(null);
         }}
-        onShowQr={() => setQrOpen(true)}
+        qrOpen={qrOpen}
+        onToggleQr={() => setQrOpen((o) => !o)}
         onSelectEpisode={selectEpisode}
       />
       {sessionId && session ? (
@@ -53,13 +54,13 @@ export function PresenterApp() {
           {selectedEpisode ? (
             <EpisodeWorkspace key={selectedEpisode} episodeId={selectedEpisode} paused={overview.paused} onClose={() => selectEpisode(null)} />
           ) : (
-            <Worklist sessionId={sessionId} onSelect={selectEpisode} paused={overview.paused} />
+            <Worklist sessionId={sessionId} onSelect={selectEpisode} paused={overview.paused} compact={qrOpen} />
           )}
+          {qrOpen && <QrPanel code={session.code} sessionId={session._id} onClose={closeQr} />}
         </div>
       ) : (
         <StartDemo />
       )}
-      {qrOpen && session && <QrOverlay code={session.code} sessionId={session._id} onClose={closeQr} />}
     </div>
   );
 }
@@ -82,13 +83,15 @@ function TopBar({
   overview,
   sessionId,
   onViewSession,
-  onShowQr,
+  qrOpen,
+  onToggleQr,
   onSelectEpisode,
 }: {
   overview: Overview;
   sessionId: Id<"demoSessions"> | null;
   onViewSession: (id: Id<"demoSessions"> | null) => void;
-  onShowQr: () => void;
+  qrOpen: boolean;
+  onToggleQr: () => void;
   onSelectEpisode: (id: Id<"episodes">) => void;
 }) {
   const setPaused = useMutation(api.presenter.setPaused);
@@ -158,8 +161,14 @@ function TopBar({
               ))
             }
           </Menu>
-          <button type="button" onClick={onShowQr} disabled={!session || viewingOld} className="rounded-md bg-accent px-3 py-1.5 font-semibold text-bg disabled:opacity-40">
-            Show QR
+          <button
+            type="button"
+            onClick={onToggleQr}
+            disabled={!session || viewingOld}
+            aria-pressed={qrOpen}
+            className={`rounded-md px-3 py-1.5 font-semibold disabled:opacity-40 ${qrOpen ? "border border-accent text-accent hover:bg-raised" : "bg-accent text-bg"}`}
+          >
+            {qrOpen ? "Hide QR" : "Show QR"}
           </button>
           <Menu label="⋯" ariaLabel="More">
             {(close) => (
