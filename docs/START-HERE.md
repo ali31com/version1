@@ -25,7 +25,7 @@ Repository: [ali31com/version1](https://github.com/ali31com/version1). Planning 
 - Presenter actions: inspect evidence, resolve questions, approve and retry. Keep the selected Episode steady as submissions arrive.
 - Visible failure and retry; no prepared-result fallback. Target 30 seconds under normal load; measure it, including queue time to first actionable result.
 - Nuclear and mature/white cataracts; left/right/both; explicit diabetes, hypertension and glaucoma documentation. Bilateral audience preset is uncomplicated. Unilateral capsule rupture includes explicit treatment and remains approval-blocked until missing coding coverage is verified.
-- Include mature/white confirmation and a presenter-only contradictory-laterality review example. These are teaching policies, distinct from national standards.
+- Include a complicated-bilateral review (both eyes, capsule rupture, diabetes or glaucoma) and a presenter-only contradictory-laterality review example; other audience scenarios auto-code. These are teaching policies, distinct from national standards.
 - Dark presenter workspace, light paper notes and light guided phone builder. Production security, EPR integration and unrestricted code editing are outside scope.
 
 ## Starting state and known gaps

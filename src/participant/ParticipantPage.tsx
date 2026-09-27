@@ -71,16 +71,12 @@ export function GemMark({ className = "h-5 w-5" }: { className?: string }) {
 }
 
 const STEP_COUNT = 10;
-const COMPLICATION_STEP = 5;
 
 function Builder({ token, view }: { token: string; view: View }) {
   const saveDraft = useMutation(api.participants.saveDraft);
   const submit = useMutation(api.participants.submit);
   const [draft, setDraft] = useState<Draft>(view.draft);
-  const [step, setStep] = useState<number>(() => {
-    const saved = Math.min(view.step, STEP_COUNT - 1);
-    return saved === COMPLICATION_STEP && view.draft.side === "both" ? COMPLICATION_STEP + 1 : saved;
-  });
+  const [step, setStep] = useState<number>(() => Math.min(view.step, STEP_COUNT - 1));
   const [error, setError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [nameInput, setNameInput] = useState(view.draft.displayName ?? "");
@@ -92,13 +88,9 @@ function Builder({ token, view }: { token: string; view: View }) {
 
   const go = (target: number, patch: Draft = {}) => {
     setError(null);
-    const merged = { ...draft, ...patch };
-    if (merged.side === "both") merged.complication = "none";
-    // Bilateral Episodes use the uncomplicated preset, so skip that step.
-    const next = target === COMPLICATION_STEP && merged.side === "both" ? (step < COMPLICATION_STEP ? target + 1 : target - 1) : target;
-    setDraft(merged);
-    setStep(next);
-    saveDraft({ token, draft: patch, step: next }).catch((e: unknown) => {
+    setDraft({ ...draft, ...patch });
+    setStep(target);
+    saveDraft({ token, draft: patch, step: target }).catch((e: unknown) => {
       setError(e instanceof ConvexError ? String(e.data) : "Could not save that answer. Check your connection.");
     });
     window.scrollTo({ top: 0 });
@@ -310,11 +302,7 @@ function Summary({ draft, onEdit }: { draft: Draft; onEdit: (step: number) => vo
     ["Age", draft.age !== undefined ? String(draft.age) : "Not answered", 2],
     ["Eye", SIDE_OPTIONS.find((o) => o.value === draft.side)?.label ?? "Not answered", 3],
     ["Cataract", CONDITION_OPTIONS.find((o) => o.value === draft.condition)?.label ?? "Not answered", 4],
-    [
-      "Complication",
-      draft.side === "both" ? "None (bilateral preset)" : (COMPLICATION_OPTIONS.find((o) => o.value === draft.complication)?.label ?? "Not answered"),
-      draft.side === "both" ? null : 5,
-    ],
+    ["Complication", COMPLICATION_OPTIONS.find((o) => o.value === draft.complication)?.label ?? "Not answered", 5],
     ["Type 2 diabetes", yesNo(draft.diabetes), 6],
     ["Hypertension", yesNo(draft.hypertension), 7],
     ["Glaucoma", yesNo(draft.glaucoma), 8],

@@ -100,7 +100,7 @@ describe("join and submit", () => {
     await t.mutation(api.participants.saveDraft, { token, step: 2, draft: { displayName: "Ada", age: 70 } });
     await t.mutation(api.participants.saveDraft, { token, step: 3, draft: { side: "both", complication: "pcr" } });
     const view = await t.query(api.participants.view, { token });
-    expect(view!.draft).toMatchObject({ displayName: "Ada", age: 70, side: "both", complication: "none" });
+    expect(view!.draft).toMatchObject({ displayName: "Ada", age: 70, side: "both", complication: "pcr" });
     expect(view!.step).toBe(3);
     await expect(t.mutation(api.participants.submit, { token })).rejects.toThrow(/cataract type/);
     await t.mutation(api.participants.saveDraft, { token, step: 9, draft: { condition: "nuclear", diabetes: true, hypertension: false, glaucoma: false } });
@@ -262,30 +262,31 @@ describe("review", () => {
     expect(d.decisions.map((x) => x.kind).sort()).toEqual(["answer", "approve"]);
   });
 
-  test("mature white confirmation is approvable and reaches the personal URL", async () => {
+  test("complicated bilateral with diabetes is approvable and reaches the personal URL", async () => {
     const { t, code } = await setup();
-    const { episodeId, token } = await submitAudience(t, code, { condition: "mature" });
+    const { episodeId, token } = await submitAudience(t, code, { side: "both", complication: "pcr", diabetes: true });
     await drain(t);
-    const d = (await t.query(api.presenter.episodeDetail, { episodeId }))!;
-    const q = d.questions[0];
-    expect(q.kind).toBe("diagnosis_confirmation");
-    await t.mutation(api.presenter.answerQuestion, { questionId: q._id, optionId: "confirm_h26_9" });
+    let d = (await t.query(api.presenter.episodeDetail, { episodeId }))!;
+    expect(d.episode).toMatchObject({ result: "sent_to_review", review: "open" });
+    expect(d.questions).toHaveLength(1);
+    await expect(t.mutation(api.presenter.approve, { episodeId })).rejects.toThrow(/Open question/);
+    await t.mutation(api.presenter.answerQuestion, { questionId: d.questions[0]._id, optionId: "confirm_coding" });
+    d = (await t.query(api.presenter.episodeDetail, { episodeId }))!;
+    expect(d.episode.review).toBe("ready");
     await t.mutation(api.presenter.approve, { episodeId });
     const view = (await t.query(api.participants.view, { token }))!;
     expect(view.episode!.review).toBe("approved");
-    expect(view.episode!.questions[0]).toMatchObject({ status: "answered" });
     expect(view.episode!.finalCoding).toMatchObject({ completedBy: "presenter" });
   });
 
-  test("capsule rupture completeness blocks approval", async () => {
+  test("mature white and unilateral capsule rupture auto-code", async () => {
     const { t, code } = await setup();
-    const { episodeId } = await submitAudience(t, code, { complication: "pcr", side: "right" });
+    const { episodeId } = await submitAudience(t, code, { condition: "mature", complication: "pcr", side: "right", glaucoma: true });
     await drain(t);
     const d = (await t.query(api.presenter.episodeDetail, { episodeId }))!;
-    expect(d.episode).toMatchObject({ result: "sent_to_review", review: "blocked" });
-    const q = d.questions.find((x) => x.kind === "completeness")!;
-    await expect(t.mutation(api.presenter.answerQuestion, { questionId: q._id, optionId: "x" })).rejects.toThrow(/cannot be answered/);
-    await expect(t.mutation(api.presenter.approve, { episodeId })).rejects.toThrow(/Approval blocked/);
+    expect(d.episode).toMatchObject({ result: "auto_coded", review: "none" });
+    expect(d.questions).toHaveLength(0);
+    expect(d.finalCoding).toMatchObject({ completedBy: "system" });
   });
 });
 

@@ -83,6 +83,8 @@ const FACT_FOR_CODE: Record<string, string> = {
   "H40.1": "glaucoma",
   "E11.9": "diabetes",
   "I10.X": "hypertension",
+  "T81.2": "complication",
+  "Y60.0": "complication",
   "C75.1": "implant",
   "C71.2": "Lens removed",
   "C64.7": "Iris hooks",
@@ -109,7 +111,7 @@ export function proposeRaw(facts: ClinicalFact[], preset: Preset): string {
       { ...cite(expected.primary), position: "primary" },
       ...expected.secondary.map((c) => ({ ...cite(c), position: "secondary" })),
     ],
-    procedureGroups: [{ label: "Cataract extraction with lens implant", codes: expected.procedures.map(cite) }],
+    procedureGroups: expected.groupings[0].map((codes, i) => ({ label: `Cataract extraction with lens implant ${i + 1}`, codes: codes.map(cite) })),
     omissions: preset.documentedSide === null ? [{ blocked: "Z94.2 or Z94.3", reason: "Operated eye conflicts" }] : [],
   });
 }

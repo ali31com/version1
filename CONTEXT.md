@@ -14,7 +14,7 @@ The owner approved the [plan](docs/plans/live-cataract-demo.md), which governs t
 
 **Episode preset**: Prepared clinical data for a supported Episode type, customised by participant choices such as age, laterality, condition, complications and comorbidities.
 
-**Supported scenario**: A cataract Episode built from the accepted choices: age-related or mature/white cataract; left, right or both eyes; documented diabetes, hypertension or glaucoma; and no complication or posterior capsule rupture with its treatment. The precise preset descriptions and compatibility boundaries are in the approved plan; code coverage must pass the reference gate.
+**Supported scenario**: A cataract Episode built from the accepted choices: age-related or mature/white cataract; left, right or both eyes; documented diabetes, hypertension or glaucoma; and no complication or posterior capsule rupture with its treatment, including a rupture in the second eye of bilateral surgery. The precise preset descriptions are in the approved plan and the [complication coding research](docs/research/complication-and-bilateral-coding.md); code coverage must pass the reference gate.
 
 **Worklist**: The live presenter view containing submitted Episodes and their coding progress.
 
@@ -28,7 +28,7 @@ The owner approved the [plan](docs/plans/live-cataract-demo.md), which governs t
 
 **Open question**: An unresolved point presented for the presenter to answer before approving the Episode's coding result. The presenter can inspect its evidence and resolve it; the first demo does not include unrestricted code editing.
 
-**Review demonstration**: A deliberately selected teaching scenario requiring presenter review: mature/white-cataract code confirmation or a presenter-only contradictory-laterality Episode.
+**Review demonstration**: A deliberately selected teaching scenario requiring presenter review: bilateral surgery with a posterior capsule rupture in a patient with diabetes or glaucoma, or a presenter-only contradictory-laterality Episode. Every other supported scenario auto-codes unless a check fails.
 
 **Processing failure**: A visible failed pipeline stage whose completed evidence remains available and whose processing can be retried. Prepared results do not replace a failed live model run.
 

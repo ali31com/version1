@@ -1,10 +1,11 @@
 // Curated, versioned coding reference library for the cataract demo.
 // Sources and verification status are recorded in
-// docs/research/cataract-preset-references.md. This is a narrow demo
+// docs/research/cataract-preset-references.md and
+// docs/research/complication-and-bilateral-coding.md. This is a narrow demo
 // catalogue, not a full TRUD release.
 
 export const REFERENCE_LIBRARY_VERSION =
-  "cataract-refs@2026-09-26.1 (ICD-10 5th Ed 2026 · OPCS-4.11 · NCCS 2026)";
+  "cataract-refs@2026-09-27.1 (ICD-10 5th Ed 2026 · OPCS-4.11 · NCCS 2026)";
 
 export type Classification = "ICD-10" | "OPCS-4";
 
@@ -32,6 +33,10 @@ const ICD_LENS_URL =
   "https://classbrowser.nhs.uk/ICD-10-5TH-Edition/vol1/block-h25-h28.htm";
 const ICD_GLAUCOMA_URL =
   "https://classbrowser.nhs.uk/ICD-10-5TH-Edition/vol1/block-h40-h42.htm";
+const ICD_INJURY_URL =
+  "https://classbrowser.nhs.uk/ICD-10-5TH-Edition/vol1/block-t80-t88.htm";
+const ICD_MISADVENTURE_URL =
+  "https://classbrowser.nhs.uk/ICD-10-5TH-Edition/vol1/block-y60-y69.htm";
 const OPCS_C_URL = "https://classbrowser.nhs.uk/OPCS-4.11/volume1-p2-1.html";
 const OPCS_Z_URL = "https://classbrowser.nhs.uk/OPCS-4.11/volume1-p2-9.html";
 const NCCS_ICD_URL =
@@ -89,6 +94,28 @@ export const REFERENCES: Reference[] = [
     code: "I10.X",
     title: "Essential (primary) hypertension",
     keywords: ["hypertension", "hypertensive", "blood pressure"],
+  },
+  {
+    id: "icd:T81.2",
+    kind: "classification",
+    source: ICD_SOURCE,
+    classification: "ICD-10",
+    code: "T81.2",
+    title: "Accidental puncture and laceration during a procedure, not elsewhere classified",
+    note: "Index: Complications → surgical procedure → accidental puncture or laceration. Posterior capsule rupture has no index entry of its own; the eye postprocedural codes H59.8/H59.9 are not used when a specific code exists.",
+    url: ICD_INJURY_URL,
+    keywords: ["rupture", "perforation", "laceration"],
+  },
+  {
+    id: "icd:Y60.0",
+    kind: "classification",
+    source: ICD_SOURCE,
+    classification: "ICD-10",
+    code: "Y60.0",
+    title: "Unintentional cut, puncture, perforation or haemorrhage during surgical operation",
+    note: "External cause for a misadventure during surgery; sequenced directly after the code describing the result. Y83.- applies only with no mention of misadventure.",
+    url: ICD_MISADVENTURE_URL,
+    keywords: ["rupture", "misadventure"],
   },
   {
     id: "opcs:C75.1",
@@ -231,10 +258,22 @@ export const REFERENCES: Reference[] = [
     standard: "DCS.XIX.7",
     title: "Complications of surgical and medical care",
     summary:
-      "Procedural complications require documented causation and an external cause code. The demo library does not yet hold a verified mapping for posterior capsule rupture.",
+      "A procedural complication is coded only when documented as such, and always with an external cause code (Y40–Y84) after it. A body-system postprocedural .8/.9 code is not used when the index leads to a specific code: posterior capsule rupture during surgery is T81.2.",
     page: "201–203",
     url: NCCS_ICD_URL,
     keywords: ["complication", "rupture", "capsule", "vitreous"],
+  },
+  {
+    id: "std:DCS.XX.8",
+    kind: "standard",
+    source: NCCS_ICD,
+    standard: "DCS.XX.8",
+    title: "Misadventure during surgical and medical care",
+    summary:
+      "Misadventure during a procedure takes a Y60–Y69 code in a secondary position after the code describing its result (for example T81.2 then Y60.0). It does not imply a mistake by the consultant.",
+    page: "224",
+    url: NCCS_ICD_URL,
+    keywords: ["rupture", "misadventure", "complication"],
   },
   {
     id: "std:PConvention2",
@@ -266,7 +305,7 @@ export const REFERENCES: Reference[] = [
     standard: "PCSZ2",
     title: "Laterality of operation (Z94)",
     summary:
-      "Documented laterality must be coded once, after all procedures on the same site. The same procedure on both sides is coded once with Z94.1.",
+      "Documented laterality must be coded once, after all procedures on the same site. The same procedure on both sides is coded once with Z94.1; procedures on only one side take that side's code.",
     page: "204",
     url: NCCS_OPCS_URL,
     keywords: ["laterality", "left", "right", "bilateral", "both eyes"],
