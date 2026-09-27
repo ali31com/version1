@@ -50,10 +50,11 @@ export function PresenterApp() {
       />
       {sessionId && session ? (
         <div className="flex min-h-0 flex-1">
-          <Worklist sessionId={sessionId} selected={selectedEpisode} onSelect={selectEpisode} paused={overview.paused} compact={selectedEpisode !== null} />
           {selectedEpisode ? (
             <EpisodeWorkspace key={selectedEpisode} episodeId={selectedEpisode} paused={overview.paused} onClose={() => selectEpisode(null)} />
-          ) : null}
+          ) : (
+            <Worklist sessionId={sessionId} onSelect={selectEpisode} paused={overview.paused} />
+          )}
         </div>
       ) : (
         <StartDemo />

@@ -6,7 +6,7 @@ import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
 import { codeTitle } from "../../convex/lib/references";
 import { ProcessingLabel, ResultBadge } from "../components/badges";
-import { PIPELINE_STAGES } from "../lib/labels";
+import { stageLabel } from "../lib/labels";
 import { formatClock, formatDuration } from "../lib/time";
 import { PaperNote } from "./PaperNote";
 
@@ -80,7 +80,7 @@ function Workspace({
   return (
     <section aria-label={`Episode ${episode.worklistId}`} className="flex min-w-0 flex-1 flex-col">
       <EpisodeHeader detail={detail} paused={paused} onClose={onClose} />
-      {run && <StageRail stages={run.stages} attempts={detail.attempts.filter((a) => a.runId === run._id)} />}
+      {run && <StageRail stages={run.stages} />}
       <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,0.95fr)]">
         <div className="scrollbar-thin min-h-0 overflow-y-auto bg-[#0a1424] p-4 md:p-6">
           {document ? (
@@ -97,7 +97,6 @@ function Workspace({
           )}
         </div>
         <div className="scrollbar-thin min-h-0 space-y-4 overflow-y-auto border-l border-line p-4">
-          <ResultCard detail={detail} />
           <QuestionCards detail={detail} selection={selection} onSelect={select} />
           {selection && (
             <Inspector detail={detail} index={index} selection={selection} onSelect={select} onClear={() => select(null)} />
@@ -166,45 +165,26 @@ function EpisodeHeader({ detail, paused, onClose }: { detail: Detail; paused: bo
       .finally(() => setBusy(false));
   };
   const canApprove = episode.review === "ready";
-  const approveHint =
-    episode.result !== "sent_to_review"
-      ? null
-      : episode.review === "approved"
-        ? "Final coding approved."
-        : episode.review === "ready"
-          ? "All Open questions answered and all checks pass."
-          : episode.review === "open"
-            ? "Answer the Open question to enable approval."
-            : "Approval blocked: see the Open question or failed checks.";
-
   return (
     <div className="shrink-0 border-b border-line bg-surface px-4 py-3">
       <div className="flex flex-wrap items-start gap-x-4 gap-y-2">
-        <button type="button" onClick={onClose} className="rounded-md border border-line-strong px-2 py-1 text-sm text-muted hover:text-text" aria-label="Back to Worklist">
+        <button type="button" onClick={onClose} className="rounded-md border border-line-strong px-2 py-1 text-muted hover:text-text" aria-label="Back to Worklist">
           ← Worklist
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className="font-mono text-xl font-bold">{episode.worklistId}</h2>
+            <h2 className="font-mono text-2xl font-bold">{episode.worklistId}</h2>
             <ResultBadge row={episode} large />
-            <span className="text-sm">
-              <ProcessingLabel row={episode} paused={paused} />
-            </span>
-            {episode.origin === "presenter" && <span className="rounded bg-white/10 px-2 py-0.5 text-xs text-muted">Presenter teaching fixture</span>}
+            <ProcessingLabel row={episode} paused={paused} />
           </div>
-          <p className="mt-1 text-sm">
+          <p className="mt-1">
             <span className="font-medium">{episode.displayName}</span>
             <span className="text-muted"> · age {episode.age} · {episode.laterality} · {episode.summary}</span>
-          </p>
-          <p className="mt-0.5 text-xs text-muted">
-            Submitted {formatClock(episode.submittedAt)}
-            {episode.firstActionableAt && <> · first actionable result in <span className="font-mono">{formatDuration(episode.firstActionableAt - episode.submittedAt)}</span></>}
-            {run && <> · run {run.number}</>}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {episode.processing === "failed" && (
-            <button type="button" disabled={busy} onClick={() => act(() => retry({ episodeId: episode._id }))} className="rounded-md bg-danger px-3 py-1.5 text-sm font-semibold text-bg disabled:opacity-50">
+            <button type="button" disabled={busy} onClick={() => act(() => retry({ episodeId: episode._id }))} className="rounded-md bg-danger px-3 py-1.5 font-semibold text-bg disabled:opacity-50">
               ↻ Retry failed stage
             </button>
           )}
@@ -213,8 +193,7 @@ function EpisodeHeader({ detail, paused, onClose }: { detail: Detail; paused: bo
               type="button"
               disabled={busy || !canApprove}
               onClick={() => act(() => approve({ episodeId: episode._id }))}
-              title={approveHint ?? undefined}
-              className="rounded-md bg-success px-3 py-1.5 text-sm font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
+              className="rounded-md bg-success px-3 py-1.5 font-semibold text-bg disabled:cursor-not-allowed disabled:opacity-40"
             >
               ✓ Approve final coding
             </button>
@@ -225,15 +204,19 @@ function EpisodeHeader({ detail, paused, onClose }: { detail: Detail; paused: bo
             onClick={() => {
               if (window.confirm("Start a new full run? The current run and its evidence stay in the history.")) act(() => rerun({ episodeId: episode._id }));
             }}
-            className="rounded-md border border-line-strong px-3 py-1.5 text-sm hover:bg-raised disabled:opacity-40"
+            className="rounded-md border border-line-strong px-3 py-1.5 hover:bg-raised disabled:opacity-40"
           >
             Rerun
           </button>
         </div>
       </div>
-      {approveHint && episode.review !== "approved" && <p className="mt-1 text-right text-xs text-muted">{approveHint}</p>}
+      {run?.failure && (
+        <p className="mt-2 font-mono text-sm break-words text-danger">
+          {stageLabel(run.failedStage ?? "")}: {run.failure}
+        </p>
+      )}
       {error && (
-        <p role="alert" className="mt-2 rounded-md bg-danger/10 px-3 py-1.5 text-sm text-danger">
+        <p role="alert" className="mt-2 rounded-md bg-danger/10 px-3 py-1.5 text-danger">
           {error}
         </p>
       )}
@@ -241,68 +224,51 @@ function EpisodeHeader({ detail, paused, onClose }: { detail: Detail; paused: bo
   );
 }
 
-function StageRail({ stages, attempts }: { stages: NonNullable<Detail["run"]>["stages"]; attempts: Detail["attempts"] }) {
+// Five presentation steps; the packet stage is hidden and question/check
+// stages are folded into Result.
+const RAIL_STEPS = [
+  { label: "MedCAT annotations", stages: ["annotate"] },
+  { label: "Clinical facts", stages: ["extract"] },
+  { label: "References", stages: ["retrieve"] },
+  { label: "Proposed codes", stages: ["propose"] },
+  { label: "Result", stages: ["resolve", "route"] },
+] as const;
+
+function StageRail({ stages }: { stages: NonNullable<Detail["run"]>["stages"] }) {
   return (
-    <ol aria-label="Pipeline stages" className="scrollbar-thin flex shrink-0 gap-1 overflow-x-auto border-b border-line bg-surface px-4 py-2">
-      {PIPELINE_STAGES.map((s, i) => {
-        const st = stages.find((x) => x.stage === s.stage);
-        const status = st?.status ?? "pending";
-        const tries = attempts.filter((a) => a.stage === s.stage);
-        const dur = st?.startedAt && st.finishedAt ? st.finishedAt - st.startedAt : null;
+    <ol aria-label="Pipeline stages" className="flex shrink-0 items-center gap-2 border-b border-line bg-surface px-4 py-3">
+      {RAIL_STEPS.map((step, i) => {
+        const statuses = step.stages.map((name) => stages.find((x) => x.stage === name)?.status ?? "pending");
+        const status = statuses.includes("failed")
+          ? "failed"
+          : statuses.every((x) => x === "done")
+            ? "done"
+            : statuses.includes("running")
+              ? "running"
+              : statuses.some((x) => x !== "pending")
+                ? "queued"
+                : "pending";
         const dot =
           status === "done"
-            ? "bg-accent"
+            ? "bg-accent text-bg"
             : status === "running"
               ? "bg-accent animate-pulse-dot"
               : status === "failed"
-                ? "bg-danger"
+                ? "bg-danger text-bg"
                 : status === "queued"
                   ? "border-2 border-accent"
                   : "border-2 border-line-strong";
         return (
-          <li key={s.stage} className="flex min-w-[8.5rem] flex-1 items-start gap-2">
-            <span className={`mt-1 inline-block h-2.5 w-2.5 shrink-0 rounded-full ${dot}`} aria-hidden="true" />
-            <div className="min-w-0">
-              <p className={`text-xs font-medium ${status === "pending" ? "text-muted" : "text-text"}`}>
-                <span className="text-muted">{i + 1}.</span> {s.label}
-              </p>
-              <p className="truncate text-xs text-muted">
-                {status}
-                {dur !== null && s.stage !== "packet" && ` · ${formatDuration(dur)}`}
-                {tries.length > 1 && ` · ${tries.length} attempts`}
-              </p>
-              <p className="truncate text-xs text-muted/80">{s.role}</p>
-            </div>
+          <li key={step.label} className="flex flex-1 items-center gap-2">
+            {i > 0 && <span className={`h-px flex-1 ${status === "pending" ? "bg-line-strong" : "bg-accent/60"}`} aria-hidden="true" />}
+            <span className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-sm font-bold ${dot}`} aria-label={status} role="img">
+              {status === "done" ? "✓" : status === "failed" ? "✕" : ""}
+            </span>
+            <span className={`whitespace-nowrap font-medium ${status === "pending" ? "text-muted" : "text-text"}`}>{step.label}</span>
           </li>
         );
       })}
     </ol>
-  );
-}
-
-function ResultCard({ detail }: { detail: Detail }) {
-  const { run, episode } = detail;
-  if (!run) return null;
-  const proposer = detail.attempts.find((a) => a.runId === run._id && a.stage === "propose" && a.status === "succeeded");
-  return (
-    <div className={`rounded-xl border p-3 ${episode.processing === "failed" ? "border-danger/40 bg-danger/10" : episode.result === "auto_coded" || episode.review === "approved" ? "border-success/30 bg-success/5" : episode.result === "sent_to_review" ? "border-warning/30 bg-warning/5" : "border-line bg-raised"}`}>
-      <p className="text-xs font-semibold tracking-wide text-muted uppercase">Coding result</p>
-      {run.reason ? (
-        <p className="mt-1 text-sm">{run.reason}</p>
-      ) : (
-        <p className="mt-1 text-sm text-muted">Processing live; results appear as each stage is accepted.</p>
-      )}
-      {run.failure && (
-        <p className="mt-2 font-mono text-xs break-words text-danger">
-          {run.failedStage}: {run.failure}
-        </p>
-      )}
-      {proposer && (
-        <p className="mt-2 text-xs text-muted">
-          Codes proposed by <span className="font-mono text-text">{proposer.model}</span> (Gemini Flash) emulating MedGemma · no confidence scores are shown.
-        </p>
-      )}
-    </div>
   );
 }
 
