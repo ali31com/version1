@@ -81,6 +81,8 @@ export function buildPrompt(input: StageInput): string {
         "Rules:",
         "- Exactly one primary diagnosis (the condition treated). Add secondary diagnoses for documented comorbidities that the standards require.",
         "- Put the procedures for one operation in one ordered procedure group; the order is the sequence. Apply the sequencing standards and code laterality once, last in the group.",
+        "- When the eyes received different procedures in the same session, use one procedure group per eye, each ending with that eye's laterality code.",
+        "- A documented intra-operative complication is a secondary diagnosis followed directly by its external cause; code the procedures that treated it after the main operation.",
         "- If a required code cannot be chosen because the documentation conflicts or is missing, omit it and record an omission naming what is blocked. Never guess a side.",
         "- Explanations are one or two short sentences naming the rule applied.",
         "",

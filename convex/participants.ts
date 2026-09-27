@@ -65,8 +65,6 @@ export const saveDraft = mutation({
     if (draft.age !== undefined && (!Number.isInteger(draft.age) || draft.age < MIN_AGE || draft.age > MAX_AGE)) {
       throw new ConvexError(`Age must be a whole number from ${MIN_AGE} to ${MAX_AGE}.`);
     }
-    // Bilateral surgery uses the uncomplicated preset only.
-    if (draft.side === "both") draft.complication = "none";
     await ctx.db.patch("participants", participant._id, { draft, step: Math.max(0, Math.min(args.step, 20)) });
     return null;
   },
