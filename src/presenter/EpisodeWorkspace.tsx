@@ -7,7 +7,9 @@ import type { Id } from "../../convex/_generated/dataModel";
 import { codeTitle } from "../../convex/lib/references";
 import { ProcessingLabel, ResultBadge } from "../components/badges";
 import { stageLabel } from "../lib/labels";
-import { formatClock, formatDuration } from "../lib/time";
+import { formatClock } from "../lib/time";
+import { ANNOTATION_CATEGORIES } from "../../convex/lib/contracts";
+import { CATEGORY_TINT } from "./medcat";
 import { PaperNote } from "./PaperNote";
 
 type Detail = NonNullable<FunctionReturnType<typeof api.presenter.episodeDetail>>;
@@ -17,22 +19,17 @@ type ProposedCode = NonNullable<Detail["proposal"]>["diagnoses"][number];
 export type Selection =
   | { kind: "code"; key: string; code: ProposedCode }
   | { kind: "fact"; id: string }
-  | { kind: "passage"; id: string }
   | { kind: "annotation"; id: string }
   | { kind: "question"; id: string }
   | null;
 
-const TABS = ["Codes", "Facts", "Hints", "References", "Checks", "Run log"] as const;
-type Tab = (typeof TABS)[number];
-
 export function EpisodeWorkspace({ episodeId, paused, onClose }: { episodeId: Id<"episodes">; paused: boolean; onClose: () => void }) {
   const detail = useQuery(api.presenter.episodeDetail, { episodeId });
   const [selection, setSelection] = useState<Selection>(null);
-  const [tab, setTab] = useState<Tab>("Codes");
 
   if (detail === undefined) return <div className="grid flex-1 place-items-center text-muted">Loading Episode…</div>;
   if (detail === null) return <div className="grid flex-1 place-items-center text-muted">Episode not found.</div>;
-  return <Workspace detail={detail} paused={paused} onClose={onClose} selection={selection} setSelection={setSelection} tab={tab} setTab={setTab} />;
+  return <Workspace detail={detail} paused={paused} onClose={onClose} selection={selection} setSelection={setSelection} />;
 }
 
 function Workspace({
@@ -41,39 +38,28 @@ function Workspace({
   onClose,
   selection,
   setSelection,
-  tab,
-  setTab,
 }: {
   detail: Detail;
   paused: boolean;
   onClose: () => void;
   selection: Selection;
   setSelection: (s: Selection) => void;
-  tab: Tab;
-  setTab: (t: Tab) => void;
 }) {
   const { episode, run, document, proposal } = detail;
   const index = useEvidenceIndex(detail);
 
-  const { highlighted, warning, spanMark } = useMemo(() => {
+  const { highlighted, warning } = useMemo(() => {
     const hi = new Set<string>();
     const warn = new Set<string>();
-    let mark: { passageId: string; start: number; end: number } | null = null;
     if (selection?.kind === "code") {
       for (const f of selection.code.factIds) index.facts.get(f)?.passageIds.forEach((p) => hi.add(p));
     } else if (selection?.kind === "fact") {
       index.facts.get(selection.id)?.passageIds.forEach((p) => hi.add(p));
-    } else if (selection?.kind === "annotation") {
-      const a = index.annotations.get(selection.id);
-      if (a) mark = { passageId: a.passageId, start: a.start, end: a.end };
     } else if (selection?.kind === "question") {
       detail.questions.find((q) => q._id === selection.id)?.passageIds.forEach((p) => warn.add(p));
     }
-    return { highlighted: hi, warning: warn, spanMark: mark };
+    return { highlighted: hi, warning: warn };
   }, [selection, index, detail.questions]);
-
-  const selectedPassage =
-    selection?.kind === "passage" ? selection.id : selection?.kind === "annotation" ? (index.annotations.get(selection.id)?.passageId ?? null) : null;
 
   const select = (s: Selection) => setSelection(s);
 
@@ -81,59 +67,43 @@ function Workspace({
     <section aria-label={`Episode ${episode.worklistId}`} className="flex min-w-0 flex-1 flex-col">
       <EpisodeHeader detail={detail} paused={paused} onClose={onClose} />
       {run && <StageRail stages={run.stages} />}
-      <div className="grid min-h-0 flex-1 grid-cols-1 xl:grid-cols-[minmax(0,1fr)_minmax(26rem,0.95fr)]">
-        <div className="scrollbar-thin min-h-0 overflow-y-auto bg-[#0a1424] p-4 md:p-6">
+      <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)_minmax(0,1fr)]">
+        <div className="scrollbar-thin min-h-0 overflow-y-auto bg-[#0a1424] p-4">
           {document ? (
             <PaperNote
               document={document}
+              annotations={detail.annotations}
               highlighted={highlighted}
               warning={warning}
-              selectedPassage={selectedPassage}
-              spanMark={spanMark}
-              onSelectPassage={(id) => select({ kind: "passage", id })}
+              selectedAnnotation={selection?.kind === "annotation" ? selection.id : null}
+              onSelectAnnotation={(id) => select({ kind: "annotation", id })}
             />
           ) : (
             <p className="text-muted">No source document.</p>
           )}
         </div>
-        <div className="scrollbar-thin min-h-0 space-y-4 overflow-y-auto border-l border-line p-4">
+        <Column title="MedCAT">
+          <MedcatPanel detail={detail} selection={selection} onSelect={select} />
+        </Column>
+        <Column title="MedGemma">
           <QuestionCards detail={detail} selection={selection} onSelect={select} />
-          {selection && (
+          {selection && selection.kind !== "annotation" && (
             <Inspector detail={detail} index={index} selection={selection} onSelect={select} onClear={() => select(null)} />
           )}
-          <div role="tablist" aria-label="Episode detail" className="flex flex-wrap gap-1 border-b border-line">
-            {TABS.map((t) => (
-              <button
-                key={t}
-                role="tab"
-                type="button"
-                aria-selected={tab === t}
-                onClick={() => setTab(t)}
-                className={`-mb-px border-b-2 px-3 py-1.5 text-sm ${tab === t ? "border-accent text-accent" : "border-transparent text-muted hover:text-text"}`}
-              >
-                {t}
-                {t === "Facts" && detail.facts.length > 0 && <Count n={detail.facts.length} />}
-                {t === "Hints" && detail.annotations.length > 0 && <Count n={detail.annotations.length} />}
-                {t === "References" && detail.references.length > 0 && <Count n={detail.references.length} />}
-              </button>
-            ))}
-          </div>
-          <div role="tabpanel">
-            {tab === "Codes" && <CodesPanel detail={detail} proposal={proposal} selection={selection} onSelect={select} />}
-            {tab === "Facts" && <FactsPanel detail={detail} selection={selection} onSelect={select} />}
-            {tab === "Hints" && <HintsPanel detail={detail} selection={selection} onSelect={select} />}
-            {tab === "References" && <ReferencesPanel refs={detail.references} />}
-            {tab === "Checks" && <ChecksPanel checks={run?.checks ?? []} />}
-            {tab === "Run log" && <RunLog detail={detail} />}
-          </div>
-        </div>
+          <CodesPanel detail={detail} proposal={proposal} selection={selection} onSelect={select} />
+        </Column>
       </div>
     </section>
   );
 }
 
-function Count({ n }: { n: number }) {
-  return <span className="ml-1.5 rounded-full bg-white/10 px-1.5 text-xs text-muted tabular-nums">{n}</span>;
+function Column({ title, children }: { title: string; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="scrollbar-thin min-h-0 space-y-4 overflow-y-auto border-l border-line p-4">
+      <h2 className="text-xl font-semibold text-accent">{title}</h2>
+      {children}
+    </section>
+  );
 }
 
 function useEvidenceIndex(detail: Detail) {
@@ -408,30 +378,6 @@ function CodesPanel({ detail, proposal, selection, onSelect }: { detail: Detail;
   );
 }
 
-function FactsPanel({ detail, selection, onSelect }: { detail: Detail; selection: Selection; onSelect: (s: Selection) => void }) {
-  if (detail.facts.length === 0) return <p className="text-sm text-muted">No accepted Clinical facts yet.</p>;
-  return (
-    <div className="space-y-2">
-      {detail.conflicts.map((c) => (
-        <div key={c.id} className="rounded-lg border border-warning/40 bg-warning/10 p-3 text-sm">
-          <p className="font-mono text-xs text-warning uppercase">Contradiction · {c.topic}</p>
-          <p className="mt-1">{c.description}</p>
-          <ul className="mt-1 space-y-0.5">
-            {c.sides.map((s, i) => (
-              <li key={i} className="text-xs text-muted">
-                <span className="text-text">{s.value}</span> — {s.passageIds.join(", ")}
-              </li>
-            ))}
-          </ul>
-        </div>
-      ))}
-      {detail.facts.map((f) => (
-        <FactCard key={f.id} fact={f} selected={selection?.kind === "fact" && selection.id === f.id} onClick={() => onSelect({ kind: "fact", id: f.id })} />
-      ))}
-    </div>
-  );
-}
-
 function FactCard({ fact, selected, onClick }: { fact: Fact; selected: boolean; onClick: () => void }) {
   return (
     <button
@@ -452,51 +398,42 @@ function FactCard({ fact, selected, onClick }: { fact: Fact; selected: boolean; 
   );
 }
 
-function HintsPanel({ detail, selection, onSelect }: { detail: Detail; selection: Selection; onSelect: (s: Selection) => void }) {
-  const annotator = detail.attempts.find((a) => a.stage === "annotate" && a.status === "succeeded");
+function MedcatPanel({ detail, selection, onSelect }: { detail: Detail; selection: Selection; onSelect: (s: Selection) => void }) {
+  if (detail.annotations.length === 0) {
+    const stage = detail.run?.stages.find((s) => s.stage === "annotate")?.status;
+    return <p className="text-muted">{stage === "done" ? "No concepts found." : "Annotating…"}</p>;
+  }
   return (
-    <div className="space-y-3">
-      <p className="rounded-md bg-white/5 px-3 py-2 text-xs text-muted">
-        Annotations are <span className="text-text">hints</span> from {annotator?.model ?? "Gemini Flash"} emulating MedCAT. They are never the reason for a code.
-      </p>
-      <div className="flex flex-wrap gap-1.5">
-        {detail.annotations.map((a) => {
-          const sel = selection?.kind === "annotation" && selection.id === a.id;
-          return (
-            <button
-              key={a.id}
-              type="button"
-              onClick={() => onSelect({ kind: "annotation", id: a.id })}
-              aria-pressed={sel}
-              title={`“${a.span}” in ${a.passageId}`}
-              className={`rounded-md border px-2 py-1 text-left text-xs ${sel ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"} ${a.status === "negated" ? "line-through decoration-muted" : ""}`}
-            >
-              <span className="text-accent">{a.concept}</span> <span className="font-mono text-xs text-muted uppercase">{a.category}{a.status !== "affirmed" && ` · ${a.status}`}</span>
-            </button>
-          );
-        })}
-      </div>
-      {detail.rejectedAnnotations.length > 0 && (
-        <div className="text-xs text-muted">
-          <p className="font-semibold text-danger">Rejected hints (span not exact)</p>
-          {detail.rejectedAnnotations.map((r, i) => (
-            <p key={i}>
-              {r.passageId}: “{r.span}” — {r.reason}
-            </p>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
-function ReferencesPanel({ refs }: { refs: Detail["references"] }) {
-  if (refs.length === 0) return <p className="text-sm text-muted">No references retrieved yet.</p>;
-  return (
-    <div className="space-y-2">
-      {refs.map((r) => (
-        <ReferenceCard key={r.id} r={r} />
-      ))}
+    <div className="space-y-4">
+      {ANNOTATION_CATEGORIES.map((category) => {
+        const items = detail.annotations.filter((a) => a.category === category);
+        if (items.length === 0) return null;
+        return (
+          <div key={category}>
+            <h3 className="mb-2 flex items-center gap-2 text-sm font-semibold tracking-wide text-muted uppercase">
+              <span className={`inline-block h-3.5 w-3.5 rounded-sm ${CATEGORY_TINT[category]}`} aria-hidden="true" />
+              {category}
+            </h3>
+            <div className="flex flex-wrap gap-2">
+              {items.map((a) => {
+                const sel = selection?.kind === "annotation" && selection.id === a.id;
+                return (
+                  <button
+                    key={a.id}
+                    type="button"
+                    onClick={() => onSelect(sel ? null : { kind: "annotation", id: a.id })}
+                    aria-pressed={sel}
+                    className={`rounded-md border px-2.5 py-1 text-left ${sel ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"}`}
+                  >
+                    <span className={a.status === "negated" ? "line-through decoration-muted" : ""}>{a.concept}</span>
+                    {a.status !== "affirmed" && <span className="ml-1.5 text-sm text-muted">{a.status}</span>}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
     </div>
   );
 }
@@ -521,109 +458,6 @@ function ReferenceCard({ r }: { r: Detail["references"][number] }) {
   );
 }
 
-function ChecksPanel({ checks }: { checks: NonNullable<Detail["run"]>["checks"] }) {
-  if (checks.length === 0) return <p className="text-sm text-muted">Checks run after the proposal is accepted.</p>;
-  return (
-    <ul className="space-y-1.5">
-      {checks.map((c) => (
-        <li key={c.id} className="flex gap-3 rounded-lg border border-line bg-raised px-3 py-2">
-          <span className={`font-mono text-sm font-bold ${c.status === "passed" ? "text-success" : c.status === "blocked" ? "text-warning" : "text-danger"}`}>
-            {c.status === "passed" ? "✓" : c.status === "blocked" ? "■" : "✕"}
-          </span>
-          <div>
-            <p className="text-sm font-medium">
-              <span className="font-mono text-muted">{c.id}</span> {c.label} <span className="text-xs text-muted">· {c.status}</span>
-            </p>
-            <p className="text-xs text-muted">{c.detail}</p>
-          </div>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function RunLog({ detail }: { detail: Detail }) {
-  const { run } = detail;
-  return (
-    <div className="space-y-4 text-xs">
-      {run && (
-        <dl className="grid grid-cols-[8rem_1fr] gap-x-3 gap-y-1">
-          <dt className="text-muted">Run</dt>
-          <dd>
-            {run.number} · {run.status}
-          </dd>
-          <dt className="text-muted">Reference library</dt>
-          <dd className="font-mono">{run.referenceVersion}</dd>
-          <dt className="text-muted">Preset</dt>
-          <dd className="font-mono">{run.presetVersion}</dd>
-          <dt className="text-muted">Prompts</dt>
-          <dd className="font-mono">{Object.values(run.promptVersions).join(" · ")}</dd>
-        </dl>
-      )}
-      <div>
-        <p className="mb-1 font-semibold">Model attempts</p>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left">
-            <thead className="text-muted">
-              <tr>
-                <th className="py-1 pr-2 font-normal">Stage</th>
-                <th className="py-1 pr-2 font-normal">Role / model</th>
-                <th className="py-1 pr-2 font-normal">#</th>
-                <th className="py-1 pr-2 font-normal">Status</th>
-                <th className="py-1 pr-2 text-right font-normal">Wait</th>
-                <th className="py-1 pr-2 text-right font-normal">Model</th>
-              </tr>
-            </thead>
-            <tbody>
-              {detail.attempts.map((a) => (
-                <tr key={a._id} className={`border-t border-line align-top ${run && a.runId !== run._id ? "opacity-50" : ""}`}>
-                  <td className="py-1 pr-2">{a.stage}</td>
-                  <td className="py-1 pr-2">
-                    {a.role} · <span className="font-mono">{a.model ?? "—"}</span>
-                  </td>
-                  <td className="py-1 pr-2 font-mono">
-                    {a.round > 0 ? `r${a.round}.` : ""}
-                    {a.attemptNumber}
-                  </td>
-                  <td className={`py-1 pr-2 ${a.status === "succeeded" ? "text-success" : a.status === "failed" || a.status === "timed_out" ? "text-danger" : "text-muted"}`}>
-                    {a.status}
-                    {a.error && <span className="block max-w-[18rem] break-words text-muted">{a.error}</span>}
-                  </td>
-                  <td className="py-1 pr-2 text-right font-mono">{a.startedAt ? formatDuration(a.startedAt - a.queuedAt) : "—"}</td>
-                  <td className="py-1 pr-2 text-right font-mono">{a.latencyMs !== null ? formatDuration(a.latencyMs) : "—"}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-      {detail.decisions.length > 0 && (
-        <div>
-          <p className="mb-1 font-semibold">Presenter decisions</p>
-          <ul className="space-y-1">
-            {detail.decisions.map((d) => (
-              <li key={d._id}>
-                <span className="font-mono text-muted">{formatClock(d.at)}</span> <span className="text-accent">{d.kind}</span> {d.summary}
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-      {detail.finalCoding && (
-        <div>
-          <p className="mb-1 font-semibold">Final coding</p>
-          <p className="font-mono">
-            {detail.finalCoding.diagnoses.map((d) => d.code).join(", ")} | {detail.finalCoding.procedures.map((p) => p.code).join(", ")}
-          </p>
-          <p className="text-muted">
-            Completed by {detail.finalCoding.completedBy} at {formatClock(detail.finalCoding.completedAt)}
-          </p>
-        </div>
-      )}
-    </div>
-  );
-}
-
 // Selection inspector: code → facts, passages, references; fact → passages,
 // hints, codes; passage → facts, codes, hints.
 function Inspector({
@@ -641,10 +475,9 @@ function Inspector({
 }) {
   const codesCitingFacts = (factIds: string[]) => index.codes.filter((c) => c.code.factIds.some((f) => factIds.includes(f)));
   const passageLink = (id: string) => (
-    <button key={id} type="button" onClick={() => onSelect({ kind: "passage", id })} className="block w-full rounded-md bg-paper px-2 py-1 text-left text-xs text-ink hover:ring-2 hover:ring-accent">
-      <span className="mr-2 font-mono text-stone-500">{id.split(".").pop()}</span>
+    <p key={id} className="rounded-md bg-paper px-2 py-1 text-sm text-ink">
       {index.passageText.get(id) ?? "(missing passage)"}
-    </button>
+    </p>
   );
   const factLink = (f: Fact) => <FactCard key={f.id} fact={f} selected={false} onClick={() => onSelect({ kind: "fact", id: f.id })} />;
   const codeLinks = (list: EvidenceIndex["codes"]) =>
@@ -699,28 +532,6 @@ function Inspector({
         <Block label="Codes citing this fact">{codeLinks(codesCitingFacts([f.id]))}</Block>
       </>
     ) : null;
-  } else if (selection.kind === "passage") {
-    const facts = detail.facts.filter((f) => f.passageIds.includes(selection.id));
-    const hints = detail.annotations.filter((a) => a.passageId === selection.id);
-    title = `Passage ${selection.id}`;
-    body = (
-      <>
-        <p className="rounded-md bg-paper px-2 py-1 text-sm text-ink">{index.passageText.get(selection.id)}</p>
-        <Block label={`Facts citing this passage (${facts.length})`}>{facts.length ? facts.map(factLink) : <p className="text-xs text-muted">No fact cites this passage.</p>}</Block>
-        <Block label="Codes supported via those facts">{codeLinks(codesCitingFacts(facts.map((f) => f.id)))}</Block>
-        {hints.length > 0 && (
-          <Block label="Annotation hints">
-            <div className="flex flex-wrap gap-1">
-              {hints.map((a) => (
-                <button key={a.id} type="button" onClick={() => onSelect({ kind: "annotation", id: a.id })} className="rounded border border-line px-1.5 py-0.5 text-xs text-accent hover:bg-white/5">
-                  {a.concept}
-                </button>
-              ))}
-            </div>
-          </Block>
-        )}
-      </>
-    );
   } else if (selection.kind === "annotation") {
     const a = index.annotations.get(selection.id);
     title = a ? `Hint · ${a.concept}` : "Hint";
