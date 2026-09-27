@@ -60,7 +60,7 @@ function Workspace({
   const select = (s: Selection) => setSelection(s);
 
   return (
-    <section aria-label={`Episode ${episode.worklistId}`} className="flex min-w-0 flex-1 flex-col">
+    <section aria-label={`Episode ${episode.displayName} (${episode.worklistId})`} className="flex min-w-0 flex-1 flex-col">
       <EpisodeHeader detail={detail} paused={paused} onClose={onClose} />
       {run && <StageRail stages={run.stages} />}
       <div className="grid min-h-0 flex-1 grid-cols-1 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,0.75fr)_minmax(0,1fr)]">
@@ -127,13 +127,13 @@ function EpisodeHeader({ detail, paused, onClose }: { detail: Detail; paused: bo
         </button>
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
-            <h2 className="font-mono text-2xl font-bold">{episode.worklistId}</h2>
+            <h2 className="truncate text-3xl font-bold">{episode.displayName}</h2>
+            <span className="font-mono text-sm text-muted">{episode.worklistId}</span>
             <ResultBadge row={episode} large />
             <ProcessingLabel row={episode} paused={paused} />
           </div>
-          <p className="mt-1">
-            <span className="font-medium">{episode.displayName}</span>
-            <span className="text-muted"> · age {episode.age} · {episode.laterality} · {episode.summary}</span>
+          <p className="mt-1 text-muted">
+            age {episode.age} · {episode.laterality} · {episode.summary}
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
