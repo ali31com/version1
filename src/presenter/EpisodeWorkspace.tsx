@@ -4,11 +4,10 @@ import { ConvexError } from "convex/values";
 import { useMemo, useState, type ReactNode } from "react";
 import { api } from "../../convex/_generated/api";
 import type { Id } from "../../convex/_generated/dataModel";
+import { ANNOTATION_CATEGORIES } from "../../convex/lib/contracts";
 import { codeTitle } from "../../convex/lib/references";
 import { ProcessingLabel, ResultBadge } from "../components/badges";
 import { stageLabel } from "../lib/labels";
-import { formatClock } from "../lib/time";
-import { ANNOTATION_CATEGORIES } from "../../convex/lib/contracts";
 import { CATEGORY_TINT } from "./medcat";
 import { PaperNote } from "./PaperNote";
 
@@ -18,7 +17,6 @@ type ProposedCode = NonNullable<Detail["proposal"]>["diagnoses"][number];
 
 export type Selection =
   | { kind: "code"; key: string; code: ProposedCode }
-  | { kind: "fact"; id: string }
   | { kind: "annotation"; id: string }
   | { kind: "question"; id: string }
   | null;
@@ -53,8 +51,6 @@ function Workspace({
     const warn = new Set<string>();
     if (selection?.kind === "code") {
       for (const f of selection.code.factIds) index.facts.get(f)?.passageIds.forEach((p) => hi.add(p));
-    } else if (selection?.kind === "fact") {
-      index.facts.get(selection.id)?.passageIds.forEach((p) => hi.add(p));
     } else if (selection?.kind === "question") {
       detail.questions.find((q) => q._id === selection.id)?.passageIds.forEach((p) => warn.add(p));
     }
@@ -87,10 +83,7 @@ function Workspace({
         </Column>
         <Column title="MedGemma">
           <QuestionCards detail={detail} selection={selection} onSelect={select} />
-          {selection && selection.kind !== "annotation" && (
-            <Inspector detail={detail} index={index} selection={selection} onSelect={select} onClear={() => select(null)} />
-          )}
-          <CodesPanel detail={detail} proposal={proposal} selection={selection} onSelect={select} />
+          <CodesPanel detail={detail} index={index} proposal={proposal} selection={selection} onSelect={select} />
         </Column>
       </div>
     </section>
@@ -107,16 +100,7 @@ function Column({ title, children }: { title: string; children: ReactNode }) {
 }
 
 function useEvidenceIndex(detail: Detail) {
-  return useMemo(() => {
-    const facts = new Map(detail.facts.map((f) => [f.id, f]));
-    const annotations = new Map(detail.annotations.map((a) => [a.id, a]));
-    const codes: { key: string; code: ProposedCode; group: string }[] = [];
-    detail.proposal?.diagnoses.forEach((d, i) => codes.push({ key: `dx:${i}`, code: d, group: "Diagnoses" }));
-    detail.proposal?.procedureGroups.forEach((g, gi) => g.codes.forEach((c, i) => codes.push({ key: `pg:${gi}:${i}`, code: c, group: g.label })));
-    const passageText = new Map<string, string>();
-    detail.document?.sections.forEach((s) => s.passages.forEach((p) => passageText.set(p.id, p.text)));
-    return { facts, annotations, codes, passageText };
-  }, [detail]);
+  return useMemo(() => ({ facts: new Map(detail.facts.map((f) => [f.id, f])) }), [detail]);
 }
 type EvidenceIndex = ReturnType<typeof useEvidenceIndex>;
 
@@ -242,13 +226,6 @@ function StageRail({ stages }: { stages: NonNullable<Detail["run"]>["stages"] })
   );
 }
 
-const BASIS_LABEL: Record<string, string> = {
-  teaching_policy: "Demo teaching policy",
-  source_conflict: "Source contradiction",
-  reference_gate: "Reference gate not passed",
-  system_failure: "System failure",
-};
-
 function QuestionCards({ detail, selection, onSelect }: { detail: Detail; selection: Selection; onSelect: (s: Selection) => void }) {
   const answer = useMutation(api.presenter.answerQuestion);
   const [error, setError] = useState<string | null>(null);
@@ -260,27 +237,16 @@ function QuestionCards({ detail, selection, onSelect }: { detail: Detail; select
         const active = selection?.kind === "question" && selection.id === q._id;
         return (
           <div key={q._id} className={`rounded-xl border p-3 ${q.status === "answered" ? "border-line bg-raised" : "border-warning/40 bg-warning/10"}`}>
-            <div className="flex items-center justify-between gap-2">
-              <p className="text-xs font-semibold tracking-wide text-warning uppercase">
-                {q.status === "answered" ? "Open question · answered" : "Open question"} · {BASIS_LABEL[q.basis]}
-              </p>
+            <div className="flex items-start justify-between gap-2">
+              <p className="font-semibold">{q.question}</p>
               {q.passageIds.length > 0 && (
-                <button type="button" aria-pressed={active} onClick={() => onSelect(active ? null : { kind: "question", id: q._id })} className="text-xs text-accent underline">
-                  {active ? "Hide passages" : `Show ${q.passageIds.length} passage${q.passageIds.length > 1 ? "s" : ""}`}
+                <button type="button" aria-pressed={active} onClick={() => onSelect(active ? null : { kind: "question", id: q._id })} className="shrink-0 text-sm text-accent underline">
+                  {active ? "Hide passages" : "Show passages"}
                 </button>
               )}
             </div>
-            <p className="mt-1 font-semibold">{q.question}</p>
-            <p className="mt-1 text-sm text-muted">
-              <span className="text-text">Re-read:</span> {q.revisited}
-            </p>
-            <p className="mt-1 text-sm text-muted">
-              <span className="text-text">Blocks:</span> {q.blocks}
-            </p>
             {q.status === "answered" && q.answer ? (
-              <p className="mt-2 text-sm text-success">
-                ✓ {q.answer.label} <span className="text-muted">· {formatClock(q.answer.at)}</span>
-              </p>
+              <p className="mt-2 text-success">✓ {q.answer.label}</p>
             ) : q.answerable ? (
               <div className="mt-2 space-y-2">
                 {q.options.map((o) => (
@@ -295,106 +261,113 @@ function QuestionCards({ detail, selection, onSelect }: { detail: Detail; select
                         .catch((e: unknown) => setError(e instanceof ConvexError ? String(e.data) : "Could not record the answer."))
                         .finally(() => setPending(false));
                     }}
-                    className="block w-full disabled:opacity-60 rounded-lg border border-warning/50 px-3 py-2 text-left hover:bg-warning/15"
+                    className="block w-full rounded-lg border border-warning/50 px-3 py-2 text-left font-semibold hover:bg-warning/15 disabled:opacity-60"
                   >
-                    <span className="block text-sm font-semibold">{o.label}</span>
-                    <span className="block text-xs text-muted">{o.detail}</span>
+                    {o.label}
                   </button>
                 ))}
               </div>
-            ) : (
-              <p className="mt-2 text-sm font-medium text-warning">Cannot be answered in this demo; final approval stays blocked.</p>
-            )}
+            ) : null}
           </div>
         );
       })}
-      {error && <p role="alert" className="text-sm text-danger">{error}</p>}
+      {error && <p role="alert" className="text-danger">{error}</p>}
     </div>
   );
 }
 
-function CodePill({ code, tag, selected, onClick, dim = false }: { code: string; tag?: string; selected: boolean; onClick: () => void; dim?: boolean }) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`flex w-full items-baseline gap-3 rounded-lg border px-3 py-2 text-left transition-colors ${
-        selected ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"
-      } ${dim ? "opacity-60" : ""}`}
-    >
-      <span className="w-14 shrink-0 font-mono text-base font-bold text-accent">{code}</span>
-      <span className="flex-1 text-sm">{codeTitle(code)}</span>
-      {tag && <span className="font-mono text-xs text-muted uppercase">{tag}</span>}
-    </button>
-  );
-}
-
-function CodesPanel({ detail, proposal, selection, onSelect }: { detail: Detail; proposal: Detail["proposal"]; selection: Selection; onSelect: (s: Selection) => void }) {
+function CodesPanel({
+  detail,
+  index,
+  proposal,
+  selection,
+  onSelect,
+}: {
+  detail: Detail;
+  index: EvidenceIndex;
+  proposal: Detail["proposal"];
+  selection: Selection;
+  onSelect: (s: Selection) => void;
+}) {
   if (!proposal) {
-    return <p className="text-sm text-muted">No codes yet. The MedGemma-role proposal appears once facts and references are accepted.</p>;
+    const stage = detail.run?.stages.find((s) => s.stage === "propose")?.status;
+    return <p className="text-muted">{stage === "failed" ? "No codes." : "Coding…"}</p>;
   }
-  const isSel = (key: string) => selection?.kind === "code" && selection.key === key;
+  const row = (key: string, code: ProposedCode, tag: string) => {
+    const open = selection?.kind === "code" && selection.key === key;
+    return (
+      <CodeRow key={key} code={code} tag={tag} open={open} index={index} references={detail.references} onToggle={() => onSelect(open ? null : { kind: "code", key, code })} />
+    );
+  };
   return (
     <div className="space-y-4">
-      {detail.run?.amended && (
-        <p className="rounded-md border border-accent/30 bg-accent/10 px-3 py-2 text-xs">
-          Amended by a recorded presenter decision. The model's original proposal is kept in the run history.
-        </p>
-      )}
       <div>
-        <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Diagnoses · ICD-10 5th Ed</h3>
-        <div className="space-y-1.5">
-          {proposal.diagnoses.map((d, i) => (
-            <CodePill key={i} code={d.code} tag={d.position ?? "secondary"} selected={isSel(`dx:${i}`)} onClick={() => onSelect({ kind: "code", key: `dx:${i}`, code: d })} />
-          ))}
-        </div>
+        <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Diagnoses · ICD-10</h3>
+        <div className="space-y-2">{proposal.diagnoses.map((d, i) => row(`dx:${i}`, d, d.position ?? "secondary"))}</div>
       </div>
       {proposal.procedureGroups.map((g, gi) => (
         <div key={gi}>
-          <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Procedures · OPCS-4.11 · {g.label}</h3>
-          <ol className="space-y-1.5">
-            {g.codes.map((c, i) => (
-              <li key={i} className="flex items-center gap-2">
-                <span className="w-5 text-right font-mono text-xs text-muted">{i + 1}</span>
-                <CodePill code={c.code} selected={isSel(`pg:${gi}:${i}`)} onClick={() => onSelect({ kind: "code", key: `pg:${gi}:${i}`, code: c })} />
-              </li>
-            ))}
-          </ol>
+          <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Procedures · OPCS-4 · {g.label}</h3>
+          <div className="space-y-2">{g.codes.map((c, i) => row(`pg:${gi}:${i}`, c, String(i + 1)))}</div>
         </div>
       ))}
       {proposal.omissions.length > 0 && (
         <div>
-          <h3 className="mb-2 text-xs font-semibold tracking-wide text-muted uppercase">Withheld by the proposer</h3>
+          <h3 className="mb-2 text-sm font-semibold tracking-wide text-muted uppercase">Withheld</h3>
           {proposal.omissions.map((o, i) => (
-            <div key={i} className="rounded-lg border border-dashed border-warning/50 px-3 py-2 text-sm">
+            <div key={i} className="rounded-lg border border-dashed border-warning/50 px-3 py-2">
               <span className="font-mono font-bold text-warning">{o.blocked}</span> <span className="text-muted">— {o.reason}</span>
             </div>
           ))}
         </div>
       )}
-      <p className="text-xs text-muted">Select a code to see its facts, highlighted source passages, explanation and references.</p>
     </div>
   );
 }
 
-function FactCard({ fact, selected, onClick }: { fact: Fact; selected: boolean; onClick: () => void }) {
+// A code expands in place to its explanation, supporting facts and references;
+// its passages are highlighted on the note by the parent selection.
+function CodeRow({
+  code,
+  tag,
+  open,
+  index,
+  references,
+  onToggle,
+}: {
+  code: ProposedCode;
+  tag: string;
+  open: boolean;
+  index: EvidenceIndex;
+  references: Detail["references"];
+  onToggle: () => void;
+}) {
+  const facts = code.factIds.map((id) => index.facts.get(id)).filter((f): f is Fact => Boolean(f));
+  const refs = code.referenceIds.map((id) => references.find((r) => r.id === id)).filter((r): r is Detail["references"][number] => Boolean(r));
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={selected}
-      className={`block w-full rounded-lg border px-3 py-2 text-left ${selected ? "border-accent bg-accent/15" : "border-line bg-raised hover:border-line-strong"}`}
-    >
-      <span className="flex items-center gap-2 font-mono text-xs uppercase">
-        <span className="text-muted">{fact.id}</span>
-        <span className="text-accent">{fact.kind}</span>
-        {fact.laterality !== "not_applicable" && <span className="text-muted">· {fact.laterality}</span>}
-        {fact.source === "presenter" && <span className="text-warning">· presenter decision</span>}
-        <span className="ml-auto text-muted normal-case">{fact.passageIds.length} passage{fact.passageIds.length > 1 ? "s" : ""}</span>
-      </span>
-      <span className="mt-0.5 block text-sm">{fact.statement}</span>
-    </button>
+    <div className={`rounded-lg border transition-colors ${open ? "border-accent bg-accent/10" : "border-line bg-raised hover:border-line-strong"}`}>
+      <button type="button" onClick={onToggle} aria-expanded={open} className="flex w-full items-baseline gap-3 px-3 py-2 text-left">
+        <span className="w-20 shrink-0 font-mono text-lg font-bold text-accent">{code.code}</span>
+        <span className="flex-1">{codeTitle(code.code)}</span>
+        <span className="font-mono text-sm text-muted uppercase">{tag}</span>
+      </button>
+      {open && (
+        <div className="space-y-3 border-t border-line px-3 py-3">
+          <p>{code.explanation}</p>
+          {facts.length > 0 && (
+            <ul className="space-y-1">
+              {facts.map((f) => (
+                <li key={f.id} className="flex gap-2">
+                  <span className="shrink-0 font-mono text-sm text-accent uppercase">{f.kind}</span>
+                  <span>{f.statement}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+          {refs.length > 0 && <p className="text-sm text-muted">{refs.map((r) => `${r.code ?? r.standard} · ${r.source}`).join("  ·  ")}</p>}
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -434,136 +407,6 @@ function MedcatPanel({ detail, selection, onSelect }: { detail: Detail; selectio
           </div>
         );
       })}
-    </div>
-  );
-}
-
-function ReferenceCard({ r }: { r: Detail["references"][number] }) {
-  return (
-    <div className="rounded-lg border border-line bg-raised px-3 py-2">
-      <p className="font-mono text-xs text-muted">
-        {r.source}
-        {r.page && ` · p.${r.page}`}
-      </p>
-      <p className="text-sm">
-        <span className="font-mono font-bold text-accent">{r.code ?? r.standard}</span> {r.title}
-      </p>
-      {(r.note || r.summary) && <p className="mt-0.5 text-xs text-muted">{r.note ?? r.summary}</p>}
-      {r.url && (
-        <a href={r.url} target="_blank" rel="noreferrer" className="text-xs text-accent underline">
-          Source ↗
-        </a>
-      )}
-    </div>
-  );
-}
-
-// Selection inspector: code → facts, passages, references; fact → passages,
-// hints, codes; passage → facts, codes, hints.
-function Inspector({
-  detail,
-  index,
-  selection,
-  onSelect,
-  onClear,
-}: {
-  detail: Detail;
-  index: EvidenceIndex;
-  selection: NonNullable<Selection>;
-  onSelect: (s: Selection) => void;
-  onClear: () => void;
-}) {
-  const codesCitingFacts = (factIds: string[]) => index.codes.filter((c) => c.code.factIds.some((f) => factIds.includes(f)));
-  const passageLink = (id: string) => (
-    <p key={id} className="rounded-md bg-paper px-2 py-1 text-sm text-ink">
-      {index.passageText.get(id) ?? "(missing passage)"}
-    </p>
-  );
-  const factLink = (f: Fact) => <FactCard key={f.id} fact={f} selected={false} onClick={() => onSelect({ kind: "fact", id: f.id })} />;
-  const codeLinks = (list: EvidenceIndex["codes"]) =>
-    list.length === 0 ? (
-      <p className="text-xs text-muted">No code cites this.</p>
-    ) : (
-      <div className="flex flex-wrap gap-1.5">
-        {list.map((c) => (
-          <button key={c.key} type="button" onClick={() => onSelect({ kind: "code", key: c.key, code: c.code })} className="rounded-md border border-line-strong px-2 py-0.5 font-mono text-sm font-bold text-accent hover:bg-accent/10">
-            {c.code.code}
-          </button>
-        ))}
-      </div>
-    );
-
-  let title: string;
-  let body: ReactNode;
-  if (selection.kind === "code") {
-    const c = selection.code;
-    const facts = c.factIds.map((id) => index.facts.get(id)).filter((f): f is Fact => Boolean(f));
-    const passages = [...new Set(facts.flatMap((f) => f.passageIds))];
-    const refs = c.referenceIds.map((id) => detail.references.find((r) => r.id === id)).filter((r): r is Detail["references"][number] => Boolean(r));
-    const missingRefs = c.referenceIds.filter((id) => !detail.references.some((r) => r.id === id));
-    title = `${c.code} · ${codeTitle(c.code)}`;
-    body = (
-      <>
-        <Block label="Explanation">
-          <p className="text-sm">{c.explanation}</p>
-        </Block>
-        <Block label={`Supporting facts (${facts.length})`}>{facts.length ? facts.map(factLink) : <p className="text-xs text-danger">No valid supporting fact.</p>}</Block>
-        <Block label={`Source passages (${passages.length})`}>{passages.map(passageLink)}</Block>
-        <Block label={`Coding references (${refs.length})`}>
-          {refs.map((r) => (
-            <ReferenceCard key={r.id} r={r} />
-          ))}
-          {missingRefs.length > 0 && <p className="text-xs text-danger">Not retrieved: {missingRefs.join(", ")}</p>}
-        </Block>
-      </>
-    );
-  } else if (selection.kind === "fact") {
-    const f = index.facts.get(selection.id);
-    title = f ? `Fact ${f.id} · ${f.kind}` : "Fact";
-    body = f ? (
-      <>
-        <p className="text-sm">{f.statement}</p>
-        <Block label="Source passages">{f.passageIds.map(passageLink)}</Block>
-        {f.annotationIds.length > 0 && (
-          <Block label="Annotation hints">
-            <p className="text-xs text-muted">{f.annotationIds.map((id) => index.annotations.get(id)?.concept ?? id).join(" · ")}</p>
-          </Block>
-        )}
-        <Block label="Codes citing this fact">{codeLinks(codesCitingFacts([f.id]))}</Block>
-      </>
-    ) : null;
-  } else if (selection.kind === "annotation") {
-    const a = index.annotations.get(selection.id);
-    title = a ? `Hint · ${a.concept}` : "Hint";
-    body = a ? (
-      <p className="text-sm">
-        “<span className="font-mono">{a.span}</span>” in {a.passageId} · {a.category} · {a.status}. Hints are not evidence on their own.
-      </p>
-    ) : null;
-  } else {
-    const q = detail.questions.find((x) => x._id === selection.id);
-    title = "Open question passages";
-    body = q ? <Block label={`${q.passageIds.length} passages`}>{q.passageIds.map(passageLink)}</Block> : null;
-  }
-
-  return (
-    <div className="rounded-xl border border-accent/40 bg-accent/5 p-3" aria-live="polite">
-      <div className="flex items-start justify-between gap-2">
-        <p className="text-sm font-semibold">{title}</p>
-        <button type="button" onClick={onClear} className="text-xs text-muted hover:text-text" aria-label="Clear selection">
-          ✕ Clear
-        </button>
-      </div>
-      <div className="mt-2 space-y-3">{body}</div>
-    </div>
-  );
-}
-
-function Block({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-1 text-xs font-semibold tracking-wide text-muted uppercase">{label}</p>
-      <div className="space-y-1">{children}</div>
     </div>
   );
 }
