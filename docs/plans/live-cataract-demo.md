@@ -153,3 +153,11 @@ Other specialties, outpatient Attendances, production security/governance work, 
 Use the existing `ali31com/version1` repository, a `codex/` branch and a milestone for the live cataract demo. Publish approved dependency-linked issues in order, label unblocked issues ready for agent work, and open a draft PR containing the plan and linked issues before implementation. Include the relevant local documents in Git; `/docs` is currently ignored and must be explicitly unignored or included as part of that PR.
 
 Use implement for incremental vertical slices. Use implement-spec with isolated managed worktrees only if the approved ticket graph exposes meaningful independent work; avoid parallel editing in the shared checkout. Maintain one unified PR with verification and code review. Attach the PR to this chat and leave merging to the owner.
+
+## Amendment: presentation clean-up (27 September 2026)
+
+The owner approved a presentation pass for a big-TV audience ([tickets](../tickets/presentation/), milestone "Presentation clean-up"). It supersedes parts of the presenter workspace section above:
+
+- Provider and model names are no longer shown as text. The provider and emulated role stay in the stored attempts and in stage naming ("MedCAT annotations", MedCAT and MedGemma column headings). Numeric confidence stays out of scope.
+- The Worklist drops search and filters. An open Episode hides the Worklist and shows Note | MedCAT | Codes (MedGemma) with no tabs; facts and references are reached from a selected code. Checks, run log and hint disclaimers are no longer displayed; their data is kept.
+- Explanatory subtitles and notices are removed from the presenter and phone apps.
